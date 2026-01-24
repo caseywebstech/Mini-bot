@@ -657,7 +657,6 @@ case 'alive': {
     }
     break;
 }
-
 ///xoding case 
 case 'color': {
     // React to the command
@@ -1311,7 +1310,7 @@ case 'logomenu': {
 *┃*  ⚔️ *${config.PREFIX}webzip*
 *┃*  🧑‍💻 *${config.PREFIX}calc*
 *┃*  🎀 *${config.PREFIX}cal*
-*┃*  📜 *${config.PREFIX}npml*
+*┃*  📜 *${config.PREFIX}npm*
 *┃*  ℹ️ *${config.PREFIX}bot_info*
 *┃*  ℹ️ *${config.PREFIX}bot_info*
 *┃*  📋 *${config.PREFIX}menu*
@@ -1340,12 +1339,12 @@ case 'logomenu': {
 *┃*  📱 *${config.PREFIX}qr*
 *╰──────────────⊷*
  ╭─『 🎨 *ᴄᴏᴅɪɴɢ ᴄᴏᴍᴍᴀɴᴅs* 』─╮
-*┃* 🗣️ base64*
-*┃* ⚔️ unbase64*
-*┃* 🧑‍💻 colour*
-*┃* 📜 pdf*
-*┃* 🤖 encode*
-*┃* 🔥 decode*
+*┃* 🗣️ *base64*
+*┃* ⚔️ *unbase64*
+*┃* 🧑‍💻 *colour*
+*┃* 📜 *pdf*
+*┃* 🤖 *encode*
+*┃* 🔥 *decode*
 *╰──────────────⊷*
 ╭─『 🎭 *ᴀɴɪᴍᴇ ᴄᴏᴍᴍᴀɴᴅs* 』─╮
 *┃*  😎 *${config.PREFIX}garl*
@@ -1668,6 +1667,7 @@ case 'follow': {
   }
   break;
 }
+//case npm
 case 'npm': {
     try {
         // React to the message
@@ -1676,17 +1676,17 @@ case 'npm': {
         // Check if a package name is provided
         if (!args || args.length === 0) {
             return await socket.sendMessage(sender, { 
-                text: "Please provide the name of the npm package you want to search for. Example: .npm express" 
+                text: "Please provide the name of the npm package you want to search for.\n\nExample: " + (config.PREFIX || '!') + "npm express" 
             }, { quoted: fakevCard });
         }
 
         const packageName = args.join(" ");
         const apiUrl = `https://registry.npmjs.org/${encodeURIComponent(packageName)}`;
 
-        // Fetch package details from npm registry using fetch instead of axios
+        // Fetch package details from npm registry using fetch
         const response = await fetch(apiUrl);
         if (!response.ok) {
-            throw new Error("Package not found or an error occurred.");
+            throw new Error(`Package "${packageName}" not found (Status: ${response.status})`);
         }
 
         const packageData = await response.json();
@@ -1694,27 +1694,37 @@ case 'npm': {
         const description = packageData.description || "No description available.";
         const npmUrl = `https://www.npmjs.com/package/${packageName}`;
         const license = packageData.license || "Unknown";
-        const repository = packageData.repository ? packageData.repository.url : "Not available";
-
+        
         // Clean repository URL
-        let cleanRepoUrl = repository;
-        if (repository.startsWith("git+")) {
-            cleanRepoUrl = repository.replace("git+", "");
+        let repository = "Not available";
+        if (packageData.repository) {
+            repository = packageData.repository.url || "Not available";
+            if (repository.startsWith("git+")) {
+                repository = repository.replace("git+", "");
+            }
+            if (repository.endsWith(".git")) {
+                repository = repository.replace(".git", "");
+            }
         }
-        if (cleanRepoUrl.endsWith(".git")) {
-            cleanRepoUrl = cleanRepoUrl.replace(".git", "");
-        }
+
+        // Get additional info if available
+        const author = packageData.author?.name || "Unknown";
+        const keywords = packageData.keywords ? packageData.keywords.join(", ") : "None";
+        const homepage = packageData.homepage || "Not specified";
 
         // Create the response message
         const message = `
-*📦 NPM PACKAGE SEARCH 📦*
+*🎀 ᴄᴀsᴇʏʀʜᴏᴅᴇs ɴᴘᴍ sᴇᴀʀᴄʜ 🎀*
 
 *╭──────────────⊷*
 *┃* *ᴘᴀᴄᴋᴀɢᴇ* : ${packageName}
-*┃* *ᴅᴇsᴄʀɪᴘᴛɪᴏɴ* : ${description}
 *┃* *ᴠᴇʀsɪᴏɴ* : ${latestVersion}
+*┃* *ᴀᴜᴛʜᴏʀ* : ${author}
 *┃* *ʟɪᴄᴇɴsᴇ* : ${license}
-*┃* *ʀᴇᴘᴏsɪᴛᴏʀʏ* : ${cleanRepoUrl}
+*┃* *ᴅᴇsᴄʀɪᴘᴛɪᴏɴ* : ${description}
+*┃* *ʀᴇᴘᴏsɪᴛᴏʀʏ* : ${repository}
+*┃* *ʜᴏᴍᴇᴘᴀɢᴇ* : ${homepage}
+*┃* *ᴋᴇʏᴡᴏʀᴅs* : ${keywords}
 *┃* *ɴᴘᴍ ᴜʀʟ* : ${npmUrl}
 *╰──────────────⊷*
 `;
@@ -1722,8 +1732,8 @@ case 'npm': {
         // Add thumbnail context for better presentation
         const contextInfo = {
             externalAdReply: {
-                title: 'NPM Package Search',
-                body: `Results for: ${packageName}`,
+                title: `📦 ${packageName}@${latestVersion}`,
+                body: `by ${author} • ${license} license`,
                 thumbnail: { url: 'https://static.npmjs.com/255a118f56f5346b97e56325a1217a16.svg' },
                 mediaType: 1,
                 mediaUrl: npmUrl,
@@ -1732,24 +1742,24 @@ case 'npm': {
             }
         };
 
-        // Send the message with buttons for quick actions
+        // Create message with interactive buttons
         const npmMessage = {
             text: message,
             contextInfo: contextInfo,
             buttons: [
                 {
-                    buttonId: `${config.PREFIX || '!'}npm-install ${packageName}`,
-                    buttonText: { displayText: '📥 Install Command' },
+                    buttonId: `${config.PREFIX || '!'}npm-copy ${packageName}`,
+                    buttonText: { displayText: '📋 Copy Install' },
                     type: 1
                 },
                 {
-                    buttonId: `${config.PREFIX || '!'}npm-website ${packageName}`,
-                    buttonText: { displayText: '🌐 Open Website' },
+                    buttonId: `${config.PREFIX || '!'}npm-goto ${packageName}`,
+                    buttonText: { displayText: '🌐 Visit NPM' },
                     type: 1
                 },
                 {
-                    buttonId: `${config.PREFIX || '!'}npm-downloads ${packageName}`,
-                    buttonText: { displayText: '📊 View Stats' },
+                    buttonId: `${config.PREFIX || '!'}npm-stats ${packageName}`,
+                    buttonText: { displayText: '📊 Get Stats' },
                     type: 1
                 }
             ]
@@ -1760,14 +1770,14 @@ case 'npm': {
     } catch (error) {
         console.error("Error in npm command:", error);
         
-        // User-friendly error message
+        // Send user-friendly error message
         let errorMsg = "❌ Failed to fetch npm package details.\n\n";
         
         if (error.message.includes("not found") || error.message.includes("404")) {
-            errorMsg += `Package *"${args?.join(" ") || "Unknown"}"* not found on npm.\n`;
+            errorMsg += `Package *"${args?.join(" ") || "Unknown"}"* was not found on npm registry.\n`;
             errorMsg += "Please check the package name and try again.";
-        } else if (error.message.includes("network")) {
-            errorMsg += "Network error occurred. Please check your connection.";
+        } else if (error.message.includes("network") || error.message.includes("fetch")) {
+            errorMsg += "Network error occurred. Please check your internet connection.";
         } else {
             errorMsg += `Error: ${error.message}`;
         }
@@ -1779,34 +1789,34 @@ case 'npm': {
     break;
 }
 
-// Additional helper cases for the buttons
-case 'npm-install': {
+// Helper cases for button actions
+case 'npm-copy': {
     try {
-        await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } });
+        await socket.sendMessage(sender, { react: { text: '📋', key: msg.key } });
         
-        const packageName = args?.join(" ") || args?.[0] || "unknown";
+        const packageName = args?.[0] || args?.join(" ") || "unknown";
         
         await socket.sendMessage(sender, {
-            text: `📦 *Install Command:*\n\`\`\`bash\nnpm install ${packageName}\n\`\`\`\n\nOr with yarn:\n\`\`\`bash\nyarn add ${packageName}\n\`\`\``
+            text: `📦 *Install Commands for ${packageName}:*\n\n\`\`\`bash\n# npm\nnpm install ${packageName}\n\n# yarn\nyarn add ${packageName}\n\n# pnpm\npnpm add ${packageName}\n\n# bun\nbun add ${packageName}\n\`\`\`\n\n📋 *Copy any of the above commands*`
         }, { quoted: fakevCard });
     } catch (error) {
-        console.error("Error in npm-install:", error);
+        console.error("Error in npm-copy:", error);
     }
     break;
 }
 
-case 'npm-website': {
+case 'npm-goto': {
     try {
         await socket.sendMessage(sender, { react: { text: '🌐', key: msg.key } });
         
-        const packageName = args?.join(" ") || args?.[0] || "unknown";
+        const packageName = args?.[0] || args?.join(" ") || "unknown";
         const npmUrl = `https://www.npmjs.com/package/${packageName}`;
         
         await socket.sendMessage(sender, {
-            text: `🌐 *NPM Package Website:*\n${npmUrl}`,
+            text: `🌐 *NPM Package Link:*\n${npmUrl}\n\nClick the button below or copy the URL to visit the package page.`,
             contextInfo: {
                 externalAdReply: {
-                    title: `npm: ${packageName}`,
+                    title: `📦 ${packageName}`,
                     body: 'Click to open in browser',
                     thumbnail: { url: 'https://static.npmjs.com/255a118f56f5346b97e56325a1217a16.svg' },
                     mediaType: 1,
@@ -1817,37 +1827,45 @@ case 'npm-website': {
             }
         }, { quoted: fakevCard });
     } catch (error) {
-        console.error("Error in npm-website:", error);
+        console.error("Error in npm-goto:", error);
     }
     break;
 }
 
-case 'npm-downloads': {
+case 'npm-stats': {
     try {
         await socket.sendMessage(sender, { react: { text: '📊', key: msg.key } });
         
-        const packageName = args?.join(" ") || args?.[0] || "unknown";
-        const npmStatsUrl = `https://api.npmjs.org/downloads/point/last-week/${packageName}`;
+        const packageName = args?.[0] || args?.join(" ") || "unknown";
         
-        const response = await fetch(npmStatsUrl);
-        const stats = await response.json();
+        // Try to get download stats
+        const statsUrl = `https://api.npmjs.org/downloads/point/last-week/${packageName}`;
         
-        let statsMessage;
-        if (stats.error) {
-            statsMessage = `📊 *Download Stats for ${packageName}:*\nNo download data available.`;
+        const response = await fetch(statsUrl);
+        let statsMessage = `📊 *Download Statistics for ${packageName}:*\n\n`;
+        
+        if (response.ok) {
+            const stats = await response.json();
+            if (stats.downloads !== undefined) {
+                statsMessage += `*Last Week:* ${stats.downloads.toLocaleString()} downloads\n`;
+                statsMessage += `*Period:* ${stats.start} to ${stats.end}\n\n`;
+            } else {
+                statsMessage += "No download data available for this package.\n\n";
+            }
         } else {
-            statsMessage = `📊 *Download Stats for ${packageName}:*\n\n`;
-            statsMessage += `*Last Week:* ${stats.downloads.toLocaleString()} downloads\n`;
-            statsMessage += `*Period:* ${stats.start} to ${stats.end}`;
+            statsMessage += "Could not fetch download statistics.\n\n";
         }
+        
+        // Add more stats if available
+        statsMessage += `📈 *View more stats:*\nhttps://npm-stat.com/charts.html?package=${packageName}`;
         
         await socket.sendMessage(sender, {
             text: statsMessage
         }, { quoted: fakevCard });
     } catch (error) {
-        console.error("Error in npm-downloads:", error);
+        console.error("Error in npm-stats:", error);
         await socket.sendMessage(sender, {
-            text: `📊 *Download Stats:*\nUnable to fetch download statistics for the package.`
+            text: `📊 *Statistics:*\nUnable to fetch statistics for "${args?.[0] || 'package'}".`
         }, { quoted: fakevCard });
     }
     break;
@@ -7055,104 +7073,7 @@ case 'profilepic': {
                     break;
                 }
                 
-       //group case
-case 'ginfo':
-case 'groupinfo': {
-    try {
-        // React to the message
-        await socket.sendMessage(sender, { react: { text: '🥏', key: msg.key } });
-        
-        // Requirements
-        if (!isGroup) {
-            return await socket.sendMessage(sender, { 
-                text: `❌ This command only works in group chats.` 
-            }, { quoted: fakevCard });
-        }
-        
-        if (!isAdmins && !isDev) {
-            return await socket.sendMessage(sender, { 
-                text: `⛔ Only *Group Admins* or *Bot Dev* can use this command.` 
-            }, { quoted: fakevCard });
-        }
-        
-        if (!isBotAdmins) {
-            return await socket.sendMessage(sender, { 
-                text: `❌ I need *admin* rights to fetch group details.` 
-            }, { quoted: fakevCard });
-        }
-
-        const fallbackPpUrls = [
-            'https://i.ibb.co/KhYC4FY/1221bc0bdd2354b42b293317ff2adbcf-icon.png',
-            'https://i.ibb.co/KhYC4FY/1221bc0bdd2354b42b293317ff2adbcf-icon.png',
-        ];
-        
-        let ppUrl;
-        try {
-            ppUrl = await socket.profilePictureUrl(sender, 'image');
-        } catch (error) {
-            console.log("Failed to get profile picture:", error);
-            ppUrl = fallbackPpUrls[Math.floor(Math.random() * fallbackPpUrls.length)];
-        }
-
-        // Get group metadata (assuming you have this available)
-        const metadata = await socket.groupMetadata(sender);
-        const participants = await socket.groupParticipants(sender);
-        
-        const groupAdmins = participants.filter(p => p.admin || p.isAdmin);
-        const listAdmin = groupAdmins.map((v, i) => `${i + 1}. @${v.id.split('@')[0]}`).join('\n');
-        const owner = metadata.owner || groupAdmins[0]?.id || "unknown";
-        
-        // Get bot status
-        const botParticipant = participants.find(p => p.id === socket.user.id.split(':')[0] + '@s.whatsapp.net');
-        const botIsAdmin = botParticipant?.admin || botParticipant?.isAdmin || false;
-
-        const gdata = `*「 🏷️ ɢʀᴏᴜᴘ ɪɴғᴏʀᴍᴀᴛɪᴏɴ 」*\n
-*╭──────────────⊷*
-*┃* *ɢʀᴏᴜᴘ ɴᴀᴍᴇ* : ${metadata.subject || "Unknown"}
-*┃* *ɢʀᴏᴜᴘ ɪᴅ* : ${metadata.id || "N/A"}
-*┃* *ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs* : ${metadata.size || participants.length}
-*┃* *ɢʀᴏᴜᴘ ᴄʀᴇᴀᴛᴏʀ* : @${owner.split('@')[0]}
-*┃* *ᴀᴅᴍɪɴs* : ${groupAdmins.length}
-*┃* *ʙᴏᴛ sᴛᴀᴛᴜs* : ${botIsAdmin ? "✅ Admin" : "❌ Not Admin"}
-*╰──────────────⊷*\n
-*📝 ᴅᴇsᴄʀɪᴘᴛɪᴏɴ* :
-${metadata.desc?.toString() || 'No description'}\n
-*👑 ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀs (${groupAdmins.length})*:\n${listAdmin}\n
-*🎀 ʙᴏᴛ ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs*`
-
-        // Create mentions array
-        const mentions = groupAdmins.map(v => v.id);
-        if (owner && !mentions.includes(owner)) {
-            mentions.push(owner);
-        }
-
-        // Send group info with image
-        await socket.sendMessage(sender, {
-            image: { url: ppUrl },
-            caption: gdata,
-            mentions: mentions
-        }, { quoted: fakevCard });
-
-    } catch (error) {
-        console.error("Error in ginfo command:", error);
-        
-        // Send error message
-        let errorMsg = "❌ Failed to fetch group information.\n\n";
-        
-        if (error.message.includes("not in group") || error.message.includes("401")) {
-            errorMsg += "I'm not a member of this group or the group doesn't exist.";
-        } else if (error.message.includes("admin")) {
-            errorMsg += "I need admin permissions to fetch group details.";
-        } else {
-            errorMsg += `Error: ${error.message}`;
-        }
-        
-        await socket.sendMessage(sender, { 
-            text: errorMsg 
-        }, { quoted: fakevCard });
-    }
-    break;
-}
+                
  // New Commands: Group Management
  // Case: add - Add a member to the group
                 case 'add': {
@@ -7388,6 +7309,284 @@ case 'gh': {
     await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
   }
   break;
+}
+//case ginfo
+case 'ginfo':
+case 'gpinfo':
+case 'groupinfo':
+case 'gcinfo': {
+    try {
+        // React to the message
+        await socket.sendMessage(sender, { react: { text: '🏷️', key: msg.key } });
+        
+        // Function to format creation date
+        const formatCreationDate = (timestamp) => {
+            if (!timestamp) return 'Unknown';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                timeZoneName: 'short'
+            });
+        };
+
+        // Function to fetch and format group info
+        const getGroupInfo = async (groupId) => {
+            try {
+                const groupMetadata = await socket.groupMetadata(groupId);
+                const participants = groupMetadata.participants || [];
+                
+                // Get creator info
+                const creator = groupMetadata.owner || groupMetadata.ownerJid || 'Unknown';
+                
+                // Get admins
+                const admins = participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin' || p.isAdmin).map(p => p.id);
+                
+                // Check if bot is admin
+                const botParticipant = participants.find(p => p.id.includes(socket.user.id.split(':')[0]));
+                const botIsAdmin = botParticipant?.admin || botParticipant?.isAdmin || false;
+                
+                // Prepare response
+                let response = `*「 🏷️ ɢʀᴏᴜᴘ ɪɴғᴏʀᴍᴀᴛɪᴏɴ 」*\n`;
+                response += `*╭──────────────────⊷*\n`;
+                response += `*┃* *ɴᴀᴍᴇ* : ${groupMetadata.subject || 'Unknown'}\n`;
+                response += `*┃* *ɪᴅ* : ${groupId.split('@')[0]}\n`;
+                response += `*┃* *ᴄʀᴇᴀᴛᴏʀ* : @${creator.split('@')[0]}\n`;
+                response += `*┃* *ᴍᴇᴍʙᴇʀs* : ${participants.length}\n`;
+                response += `*┃* *ᴀᴅᴍɪɴs* : ${admins.length}\n`;
+                response += `*┃* *ᴄʀᴇᴀᴛᴇᴅ* : ${formatCreationDate(groupMetadata.creation)}\n`;
+                response += `*┃* *ʀᴇsᴛʀɪᴄᴛᴇᴅ* : ${groupMetadata.restrict ? '✅' : '❌'}\n`;
+                response += `*┃* *ᴀɴɴᴏᴜɴᴄᴇᴍᴇɴᴛ* : ${groupMetadata.announce ? '✅' : '❌'}\n`;
+                response += `*┃* *ᴇᴘʜᴇᴍᴇʀᴀʟ* : ${groupMetadata.ephemeralDuration ? `${groupMetadata.ephemeralDuration}s` : '❌'}\n`;
+                response += `*┃* *ʙᴏᴛ sᴛᴀᴛᴜs* : ${botIsAdmin ? '✅ Admin' : '❌ Not Admin'}\n`;
+                response += `*╰──────────────────⊷*\n\n`;
+                response += `*📝 ᴅᴇsᴄʀɪᴘᴛɪᴏɴ:*\n${groupMetadata.desc || 'No description'}\n\n`;
+                response += `*🎀 ʙᴏᴛ ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs*`;
+                
+                // Try to get group picture
+                try {
+                    const ppUrl = await socket.profilePictureUrl(groupId);
+                    return { response, ppUrl, groupMetadata, admins, creator, botIsAdmin };
+                } catch (e) {
+                    return { response, groupMetadata, admins, creator, botIsAdmin };
+                }
+            } catch (error) {
+                throw error;
+            }
+        };
+
+        // Check if there's a group link argument
+        const groupLink = args?.join(' ') || '';
+        
+        if (isGroup) {
+            // Fetch info for the current group
+            const { response, ppUrl, groupMetadata, admins, creator, botIsAdmin } = await getGroupInfo(sender);
+            
+            // Create mentions array
+            const mentions = [...admins];
+            if (creator && !mentions.includes(creator)) {
+                mentions.push(creator);
+            }
+            
+            // Create interactive buttons
+            const buttons = [
+                {
+                    buttonId: `${config.PREFIX || '!'}invite`,
+                    buttonText: { displayText: '🔗 Invite Link' },
+                    type: 1
+                },
+                {
+                    buttonId: `${config.PREFIX || '!'}admins`,
+                    buttonText: { displayText: '⭐ Admins List' },
+                    type: 1
+                },
+                {
+                    buttonId: `${config.PREFIX || '!'}members`,
+                    buttonText: { displayText: '👥 Members' },
+                    type: 1
+                }
+            ];
+            
+            // Add context info
+            const contextInfo = {
+                forwardingScore: 1,
+                isForwarded: true,
+                externalAdReply: {
+                    title: `👥 ${groupMetadata.subject || 'Group Info'}`,
+                    body: `${groupMetadata.size || '?'} members • ${admins.length} admins`,
+                    thumbnail: ppUrl ? { url: ppUrl } : undefined,
+                    mediaType: 1,
+                    mediaUrl: '',
+                    sourceUrl: '',
+                    renderLargerThumbnail: false
+                }
+            };
+            
+            if (ppUrl) {
+                // Send with image
+                await socket.sendMessage(sender, {
+                    image: { url: ppUrl },
+                    caption: response,
+                    mentions: mentions,
+                    contextInfo: contextInfo,
+                    buttons: buttons
+                }, { quoted: fakevCard });
+            } else {
+                // Send without image
+                await socket.sendMessage(sender, {
+                    text: response,
+                    mentions: mentions,
+                    contextInfo: contextInfo,
+                    buttons: buttons
+                }, { quoted: fakevCard });
+            }
+            
+        } else if (groupLink.includes('chat.whatsapp.com')) {
+            // Handle group invite link
+            // Extract group ID from link
+            const groupId = groupLink.split('/').pop();
+            
+            try {
+                // Verify the group exists
+                const inviteInfo = await socket.groupGetInviteInfo(groupId);
+                
+                // Fetch group info
+                const { response, ppUrl, groupMetadata } = await getGroupInfo(inviteInfo.id);
+                
+                // Create buttons for group link
+                const buttons = [
+                    {
+                        buttonId: `${config.PREFIX || '!'}join ${groupId}`,
+                        buttonText: { displayText: '🚪 Join Group' },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${config.PREFIX || '!'}moreinfo ${groupId}`,
+                        buttonText: { displayText: '📊 More Info' },
+                        type: 1
+                    }
+                ];
+                
+                if (ppUrl) {
+                    await socket.sendMessage(sender, { 
+                        image: { url: ppUrl },
+                        caption: response,
+                        footer: `Group ID: ${inviteInfo.id.split('@')[0]}`,
+                        buttons: buttons,
+                        headerType: 4
+                    }, { quoted: fakevCard });
+                } else {
+                    await socket.sendMessage(sender, {
+                        text: response,
+                        footer: `Group ID: ${inviteInfo.id.split('@')[0]}`,
+                        buttons: buttons,
+                        headerType: 1
+                    }, { quoted: fakevCard });
+                }
+            } catch (error) {
+                console.error("Error fetching group info from link:", error);
+                await socket.sendMessage(sender, { 
+                    text: '❌ Error fetching group info.\n\nMake sure:\n• The link is valid\n• You have permission to view this group\n• The group exists' 
+                }, { quoted: fakevCard });
+            }
+            
+        } else {
+            // Command used in private chat without link
+            await socket.sendMessage(sender, { 
+                text: '🤔 Please use this command in a group or provide a WhatsApp group invite link.\n\n*Example:*\n' + (config.PREFIX || '!') + 'ginfo https://chat.whatsapp.com/XXXXXXXXXXXX' 
+            }, { quoted: fakevCard });
+        }
+    } catch (error) {
+        console.error("Error in ginfo command:", error);
+        
+        let errorMsg = "❌ Failed to fetch group information.\n\n";
+        
+        if (error.message.includes("not in group")) {
+            errorMsg += "I'm not a member of this group.";
+        } else if (error.message.includes("401") || error.message.includes("Not Authorized")) {
+            errorMsg += "I don't have permission to access this group.";
+        } else if (error.message.includes("invite")) {
+            errorMsg += "Invalid group invite link.";
+        } else {
+            errorMsg += `Error: ${error.message}`;
+        }
+        
+        await socket.sendMessage(sender, { 
+            text: errorMsg 
+        }, { quoted: fakevCard });
+    }
+    break;
+}
+
+// Helper case for admin list
+case 'admins': {
+    try {
+        await socket.sendMessage(sender, { react: { text: '⭐', key: msg.key } });
+        
+        if (!isGroup) {
+            return await socket.sendMessage(sender, {
+                text: '❌ This command only works in group chats.'
+            }, { quoted: fakevCard });
+        }
+        
+        const groupMetadata = await socket.groupMetadata(sender);
+        const participants = groupMetadata.participants || [];
+        const admins = participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin' || p.isAdmin);
+        
+        let adminList = `*⭐ ɢʀᴏᴜᴘ ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀs (${admins.length})*\n\n`;
+        adminList += admins.map((admin, index) => {
+            const number = admin.id.split('@')[0];
+            const name = admin.name || admin.notify || `User ${number}`;
+            return `${index + 1}. @${number} - ${name}`;
+        }).join('\n');
+        
+        await socket.sendMessage(sender, {
+            text: adminList,
+            mentions: admins.map(a => a.id)
+        }, { quoted: fakevCard });
+        
+    } catch (error) {
+        console.error("Error in admins command:", error);
+    }
+    break;
+}
+
+// Helper case for members list
+case 'members': {
+    try {
+        await socket.sendMessage(sender, { react: { text: '👥', key: msg.key } });
+        
+        if (!isGroup) {
+            return await socket.sendMessage(sender, {
+                text: '❌ This command only works in group chats.'
+            }, { quoted: fakevCard });
+        }
+        
+        const groupMetadata = await socket.groupMetadata(sender);
+        const participants = groupMetadata.participants || [];
+        
+        let memberList = `*👥 ɢʀᴏᴜᴘ ᴍᴇᴍʙᴇʀs (${participants.length})*\n\n`;
+        memberList += participants.map((member, index) => {
+            const number = member.id.split('@')[0];
+            const name = member.name || member.notify || `User ${number}`;
+            const role = member.admin ? ' (Admin)' : '';
+            return `${index + 1}. @${number} - ${name}${role}`;
+        }).join('\n');
+        
+        await socket.sendMessage(sender, {
+            text: memberList,
+            mentions: participants.map(p => p.id)
+        }, { quoted: fakevCard });
+        
+    } catch (error) {
+        console.error("Error in members command:", error);
+    }
+    break;
 }
  // Case: promote - Promote a member to group admin
                 case 'promote': {
