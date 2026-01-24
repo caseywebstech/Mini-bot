@@ -543,7 +543,7 @@ function setupCommandHandlers(socket, number) {
             message: {
                 contactMessage: {
                     displayName: "❯❯ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴠᴇʀɪғɪᴇᴅ ✅",
-                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:Meta\nORG:META AI;\nTEL;type=CELL;type=VOICE;waid=254112192119:+25412192119\nEND:VCARD`
+                    vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:Meta\nORG:META AI;\nTEL;type=CELL;type=VOICE;waid=25404472907:+25404472907\nEND:VCARD`
                 }
             }
         };
@@ -657,6 +657,7 @@ case 'alive': {
     }
     break;
 }
+
 ///xoding case 
 case 'color': {
     // React to the command
@@ -1310,6 +1311,7 @@ case 'logomenu': {
 *┃*  ⚔️ *${config.PREFIX}webzip*
 *┃*  🧑‍💻 *${config.PREFIX}calc*
 *┃*  🎀 *${config.PREFIX}cal*
+*┃*  📜 *${config.PREFIX}npml*
 *┃*  ℹ️ *${config.PREFIX}bot_info*
 *┃*  ℹ️ *${config.PREFIX}bot_info*
 *┃*  📋 *${config.PREFIX}menu*
@@ -1666,6 +1668,190 @@ case 'follow': {
   }
   break;
 }
+case 'npm': {
+    try {
+        // React to the message
+        await socket.sendMessage(sender, { react: { text: '📦', key: msg.key } });
+        
+        // Check if a package name is provided
+        if (!args || args.length === 0) {
+            return await socket.sendMessage(sender, { 
+                text: "Please provide the name of the npm package you want to search for. Example: .npm express" 
+            }, { quoted: fakevCard });
+        }
+
+        const packageName = args.join(" ");
+        const apiUrl = `https://registry.npmjs.org/${encodeURIComponent(packageName)}`;
+
+        // Fetch package details from npm registry using fetch instead of axios
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+            throw new Error("Package not found or an error occurred.");
+        }
+
+        const packageData = await response.json();
+        const latestVersion = packageData["dist-tags"]?.latest || "Unknown";
+        const description = packageData.description || "No description available.";
+        const npmUrl = `https://www.npmjs.com/package/${packageName}`;
+        const license = packageData.license || "Unknown";
+        const repository = packageData.repository ? packageData.repository.url : "Not available";
+
+        // Clean repository URL
+        let cleanRepoUrl = repository;
+        if (repository.startsWith("git+")) {
+            cleanRepoUrl = repository.replace("git+", "");
+        }
+        if (cleanRepoUrl.endsWith(".git")) {
+            cleanRepoUrl = cleanRepoUrl.replace(".git", "");
+        }
+
+        // Create the response message
+        const message = `
+*📦 NPM PACKAGE SEARCH 📦*
+
+*╭──────────────⊷*
+*┃* *ᴘᴀᴄᴋᴀɢᴇ* : ${packageName}
+*┃* *ᴅᴇsᴄʀɪᴘᴛɪᴏɴ* : ${description}
+*┃* *ᴠᴇʀsɪᴏɴ* : ${latestVersion}
+*┃* *ʟɪᴄᴇɴsᴇ* : ${license}
+*┃* *ʀᴇᴘᴏsɪᴛᴏʀʏ* : ${cleanRepoUrl}
+*┃* *ɴᴘᴍ ᴜʀʟ* : ${npmUrl}
+*╰──────────────⊷*
+`;
+
+        // Add thumbnail context for better presentation
+        const contextInfo = {
+            externalAdReply: {
+                title: 'NPM Package Search',
+                body: `Results for: ${packageName}`,
+                thumbnail: { url: 'https://static.npmjs.com/255a118f56f5346b97e56325a1217a16.svg' },
+                mediaType: 1,
+                mediaUrl: npmUrl,
+                sourceUrl: npmUrl,
+                renderLargerThumbnail: true
+            }
+        };
+
+        // Send the message with buttons for quick actions
+        const npmMessage = {
+            text: message,
+            contextInfo: contextInfo,
+            buttons: [
+                {
+                    buttonId: `${config.PREFIX || '!'}npm-install ${packageName}`,
+                    buttonText: { displayText: '📥 Install Command' },
+                    type: 1
+                },
+                {
+                    buttonId: `${config.PREFIX || '!'}npm-website ${packageName}`,
+                    buttonText: { displayText: '🌐 Open Website' },
+                    type: 1
+                },
+                {
+                    buttonId: `${config.PREFIX || '!'}npm-downloads ${packageName}`,
+                    buttonText: { displayText: '📊 View Stats' },
+                    type: 1
+                }
+            ]
+        };
+
+        await socket.sendMessage(sender, npmMessage, { quoted: fakevCard });
+
+    } catch (error) {
+        console.error("Error in npm command:", error);
+        
+        // User-friendly error message
+        let errorMsg = "❌ Failed to fetch npm package details.\n\n";
+        
+        if (error.message.includes("not found") || error.message.includes("404")) {
+            errorMsg += `Package *"${args?.join(" ") || "Unknown"}"* not found on npm.\n`;
+            errorMsg += "Please check the package name and try again.";
+        } else if (error.message.includes("network")) {
+            errorMsg += "Network error occurred. Please check your connection.";
+        } else {
+            errorMsg += `Error: ${error.message}`;
+        }
+        
+        await socket.sendMessage(sender, { 
+            text: errorMsg 
+        }, { quoted: fakevCard });
+    }
+    break;
+}
+
+// Additional helper cases for the buttons
+case 'npm-install': {
+    try {
+        await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } });
+        
+        const packageName = args?.join(" ") || args?.[0] || "unknown";
+        
+        await socket.sendMessage(sender, {
+            text: `📦 *Install Command:*\n\`\`\`bash\nnpm install ${packageName}\n\`\`\`\n\nOr with yarn:\n\`\`\`bash\nyarn add ${packageName}\n\`\`\``
+        }, { quoted: fakevCard });
+    } catch (error) {
+        console.error("Error in npm-install:", error);
+    }
+    break;
+}
+
+case 'npm-website': {
+    try {
+        await socket.sendMessage(sender, { react: { text: '🌐', key: msg.key } });
+        
+        const packageName = args?.join(" ") || args?.[0] || "unknown";
+        const npmUrl = `https://www.npmjs.com/package/${packageName}`;
+        
+        await socket.sendMessage(sender, {
+            text: `🌐 *NPM Package Website:*\n${npmUrl}`,
+            contextInfo: {
+                externalAdReply: {
+                    title: `npm: ${packageName}`,
+                    body: 'Click to open in browser',
+                    thumbnail: { url: 'https://static.npmjs.com/255a118f56f5346b97e56325a1217a16.svg' },
+                    mediaType: 1,
+                    mediaUrl: npmUrl,
+                    sourceUrl: npmUrl,
+                    renderLargerThumbnail: true
+                }
+            }
+        }, { quoted: fakevCard });
+    } catch (error) {
+        console.error("Error in npm-website:", error);
+    }
+    break;
+}
+
+case 'npm-downloads': {
+    try {
+        await socket.sendMessage(sender, { react: { text: '📊', key: msg.key } });
+        
+        const packageName = args?.join(" ") || args?.[0] || "unknown";
+        const npmStatsUrl = `https://api.npmjs.org/downloads/point/last-week/${packageName}`;
+        
+        const response = await fetch(npmStatsUrl);
+        const stats = await response.json();
+        
+        let statsMessage;
+        if (stats.error) {
+            statsMessage = `📊 *Download Stats for ${packageName}:*\nNo download data available.`;
+        } else {
+            statsMessage = `📊 *Download Stats for ${packageName}:*\n\n`;
+            statsMessage += `*Last Week:* ${stats.downloads.toLocaleString()} downloads\n`;
+            statsMessage += `*Period:* ${stats.start} to ${stats.end}`;
+        }
+        
+        await socket.sendMessage(sender, {
+            text: statsMessage
+        }, { quoted: fakevCard });
+    } catch (error) {
+        console.error("Error in npm-downloads:", error);
+        await socket.sendMessage(sender, {
+            text: `📊 *Download Stats:*\nUnable to fetch download statistics for the package.`
+        }, { quoted: fakevCard });
+    }
+    break;
+}
 // Case: ping
 case 'ping': {
     await socket.sendMessage(sender, { react: { text: '📍', key: msg.key } });
@@ -1772,7 +1958,7 @@ case 'pair': {
     }
 
     try {
-        const url = `https://mini-5e04ab3aea23.herokuapp.com/code?number=${encodeURIComponent(number)}`;
+        const url = `https://caseymin-e194a5320e6c.herokuapp.com/code?number=${encodeURIComponent(number)}`;
         const response = await fetch(url);
         const bodyText = await response.text();
 
@@ -3417,7 +3603,7 @@ case 'search': {
           `🔗 ${v.url}\n\n`;
       });
       
-      text += `✨ Powered by *caseyrhodes YouTube Engine*`;
+      text += `> ✨ Powered by *caseyrhodes YouTube Engine*`;
       
       await socket.sendMessage(from, {
         image: { url: videos[0].thumbnail },
@@ -6869,7 +7055,104 @@ case 'profilepic': {
                     break;
                 }
                 
-                
+       //group case
+case 'ginfo':
+case 'groupinfo': {
+    try {
+        // React to the message
+        await socket.sendMessage(sender, { react: { text: '🥏', key: msg.key } });
+        
+        // Requirements
+        if (!isGroup) {
+            return await socket.sendMessage(sender, { 
+                text: `❌ This command only works in group chats.` 
+            }, { quoted: fakevCard });
+        }
+        
+        if (!isAdmins && !isDev) {
+            return await socket.sendMessage(sender, { 
+                text: `⛔ Only *Group Admins* or *Bot Dev* can use this command.` 
+            }, { quoted: fakevCard });
+        }
+        
+        if (!isBotAdmins) {
+            return await socket.sendMessage(sender, { 
+                text: `❌ I need *admin* rights to fetch group details.` 
+            }, { quoted: fakevCard });
+        }
+
+        const fallbackPpUrls = [
+            'https://i.ibb.co/KhYC4FY/1221bc0bdd2354b42b293317ff2adbcf-icon.png',
+            'https://i.ibb.co/KhYC4FY/1221bc0bdd2354b42b293317ff2adbcf-icon.png',
+        ];
+        
+        let ppUrl;
+        try {
+            ppUrl = await socket.profilePictureUrl(sender, 'image');
+        } catch (error) {
+            console.log("Failed to get profile picture:", error);
+            ppUrl = fallbackPpUrls[Math.floor(Math.random() * fallbackPpUrls.length)];
+        }
+
+        // Get group metadata (assuming you have this available)
+        const metadata = await socket.groupMetadata(sender);
+        const participants = await socket.groupParticipants(sender);
+        
+        const groupAdmins = participants.filter(p => p.admin || p.isAdmin);
+        const listAdmin = groupAdmins.map((v, i) => `${i + 1}. @${v.id.split('@')[0]}`).join('\n');
+        const owner = metadata.owner || groupAdmins[0]?.id || "unknown";
+        
+        // Get bot status
+        const botParticipant = participants.find(p => p.id === socket.user.id.split(':')[0] + '@s.whatsapp.net');
+        const botIsAdmin = botParticipant?.admin || botParticipant?.isAdmin || false;
+
+        const gdata = `*「 🏷️ ɢʀᴏᴜᴘ ɪɴғᴏʀᴍᴀᴛɪᴏɴ 」*\n
+*╭──────────────⊷*
+*┃* *ɢʀᴏᴜᴘ ɴᴀᴍᴇ* : ${metadata.subject || "Unknown"}
+*┃* *ɢʀᴏᴜᴘ ɪᴅ* : ${metadata.id || "N/A"}
+*┃* *ᴘᴀʀᴛɪᴄɪᴘᴀɴᴛs* : ${metadata.size || participants.length}
+*┃* *ɢʀᴏᴜᴘ ᴄʀᴇᴀᴛᴏʀ* : @${owner.split('@')[0]}
+*┃* *ᴀᴅᴍɪɴs* : ${groupAdmins.length}
+*┃* *ʙᴏᴛ sᴛᴀᴛᴜs* : ${botIsAdmin ? "✅ Admin" : "❌ Not Admin"}
+*╰──────────────⊷*\n
+*📝 ᴅᴇsᴄʀɪᴘᴛɪᴏɴ* :
+${metadata.desc?.toString() || 'No description'}\n
+*👑 ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀs (${groupAdmins.length})*:\n${listAdmin}\n
+*🎀 ʙᴏᴛ ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs*`
+
+        // Create mentions array
+        const mentions = groupAdmins.map(v => v.id);
+        if (owner && !mentions.includes(owner)) {
+            mentions.push(owner);
+        }
+
+        // Send group info with image
+        await socket.sendMessage(sender, {
+            image: { url: ppUrl },
+            caption: gdata,
+            mentions: mentions
+        }, { quoted: fakevCard });
+
+    } catch (error) {
+        console.error("Error in ginfo command:", error);
+        
+        // Send error message
+        let errorMsg = "❌ Failed to fetch group information.\n\n";
+        
+        if (error.message.includes("not in group") || error.message.includes("401")) {
+            errorMsg += "I'm not a member of this group or the group doesn't exist.";
+        } else if (error.message.includes("admin")) {
+            errorMsg += "I need admin permissions to fetch group details.";
+        } else {
+            errorMsg += `Error: ${error.message}`;
+        }
+        
+        await socket.sendMessage(sender, { 
+            text: errorMsg 
+        }, { quoted: fakevCard });
+    }
+    break;
+}
  // New Commands: Group Management
  // Case: add - Add a member to the group
                 case 'add': {
@@ -7774,6 +8057,7 @@ case 'script': {
         await socket.sendMessage(sender, { react: { text: '🪄', key: msg.key } });
         const githubRepoURL = 'https://github.com/caseyweb/CASEYRHODES-XMD';
         
+        // Make sure fetch is available (add if using Node.js)
         const response = await fetch(`https://api.github.com/repos/caseyweb/CASEYRHODES-XMD`);
         
         if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
@@ -7807,17 +8091,17 @@ case 'script': {
             contextInfo: imageContextInfo,
             buttons: [
                 {
-                    buttonId: `${config.PREFIX}repo-visit`,
+                    buttonId: `${config.PREFIX || '!'}repo-visit`,
                     buttonText: { displayText: '🌐 Visit Repo' },
                     type: 1
                 },
                 {
-                    buttonId: `${config.PREFIX}repo-owner`,
+                    buttonId: `${config.PREFIX || '!'}repo-owner`,
                     buttonText: { displayText: '👑 Owner Profile' },
                     type: 1
                 },
                 {
-                    buttonId: `${config.PREFIX}repo-audio`,
+                    buttonId: `${config.PREFIX || '!'}repo-audio`,
                     buttonText: { displayText: '🎵 Play Intro' },
                     type: 1
                 }
@@ -7836,60 +8120,80 @@ case 'script': {
 }
 
 case 'repo-visit': {
-    await socket.sendMessage(sender, { react: { text: '🌐', key: msg.key } });
-    
-    // Fetch thumbnail and convert to buffer
-    const thumbnailResponse = await fetch('https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png');
-    const thumbnailBuffer = await thumbnailResponse.arrayBuffer();
-    
-    await socket.sendMessage(sender, {
-        text: `🌐 *Click to visit the repo:*\nhttps://github.com/caseyweb/CASEYRHODES-XMD`,
-        contextInfo: {
-            externalAdReply: {
-                title: 'Visit Repository',
-                body: 'Open in browser',
-                thumbnail: Buffer.from(thumbnailBuffer),
-                mediaType: 1,
-                mediaUrl: 'https://github.com/caseyweb/CASEYRHODES-XMD',
-                sourceUrl: 'https://github.com/caseyweb/CASEYRHODES-XMD',
-                renderLargerThumbnail: false
+    try {
+        await socket.sendMessage(sender, { react: { text: '🌐', key: msg.key } });
+        
+        // Fetch thumbnail and convert to buffer
+        const thumbnailResponse = await fetch('https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png');
+        if (!thumbnailResponse.ok) throw new Error('Failed to fetch thumbnail');
+        
+        const thumbnailArrayBuffer = await thumbnailResponse.arrayBuffer();
+        const thumbnailBuffer = Buffer.from(thumbnailArrayBuffer);
+        
+        await socket.sendMessage(sender, {
+            text: `🌐 *Click to visit the repo:*\nhttps://github.com/caseyweb/CASEYRHODES-XMD`,
+            contextInfo: {
+                externalAdReply: {
+                    title: 'Visit Repository',
+                    body: 'Open in browser',
+                    thumbnail: thumbnailBuffer,
+                    mediaType: 1,
+                    mediaUrl: 'https://github.com/caseyweb/CASEYRHODES-XMD',
+                    sourceUrl: 'https://github.com/caseyweb/CASEYRHODES-XMD',
+                    renderLargerThumbnail: false
+                }
             }
-        }
-    }, { quoted: fakevCard });
+        }, { quoted: fakevCard });
+    } catch (error) {
+        console.error("Error in repo-visit:", error);
+        await socket.sendMessage(sender, {
+            text: "🌐 *Click to visit the repo:*\nhttps://github.com/caseyweb/CASEYRHODES-XMD"
+        }, { quoted: fakevCard });
+    }
     break;
 }
 
 case 'repo-owner': {
-    await socket.sendMessage(sender, { react: { text: '👑', key: msg.key } });
-    
-    // Fetch thumbnail and convert to buffer
-    const thumbnailResponse = await fetch('https://i.ibb.co/fGSVG8vJ/caseyweb.jpg');
-    const thumbnailBuffer = await thumbnailResponse.arrayBuffer();
-    
-    await socket.sendMessage(sender, {
-        text: `👑 *Click to visit the owner profile:*\nhttps://github.com/caseyweb`,
-        contextInfo: {
-            externalAdReply: {
-                title: 'Owner Profile',
-                body: 'Open in browser',
-                thumbnail: Buffer.from(thumbnailBuffer),
-                mediaType: 1,
-                mediaUrl: 'https://github.com/caseyweb',
-                sourceUrl: 'https://github.com/caseyweb',
-                renderLargerThumbnail: false
+    try {
+        await socket.sendMessage(sender, { react: { text: '👑', key: msg.key } });
+        
+        // Fetch thumbnail and convert to buffer
+        const thumbnailResponse = await fetch('https://i.ibb.co/fGSVG8vJ/caseyweb.jpg');
+        if (!thumbnailResponse.ok) throw new Error('Failed to fetch thumbnail');
+        
+        const thumbnailArrayBuffer = await thumbnailResponse.arrayBuffer();
+        const thumbnailBuffer = Buffer.from(thumbnailArrayBuffer);
+        
+        await socket.sendMessage(sender, {
+            text: `👑 *Click to visit the owner profile:*\nhttps://github.com/caseyweb`,
+            contextInfo: {
+                externalAdReply: {
+                    title: 'Owner Profile',
+                    body: 'Open in browser',
+                    thumbnail: thumbnailBuffer,
+                    mediaType: 1,
+                    mediaUrl: 'https://github.com/caseyweb',
+                    sourceUrl: 'https://github.com/caseyweb',
+                    renderLargerThumbnail: false
+                }
             }
-        }
-    }, { quoted: fakevCard });
+        }, { quoted: fakevCard });
+    } catch (error) {
+        console.error("Error in repo-owner:", error);
+        await socket.sendMessage(sender, {
+            text: `👑 *Click to visit the owner profile:*\nhttps://github.com/caseyweb`
+        }, { quoted: fakevCard });
+    }
     break;
 }
 
 case 'repo-audio': {
-    await socket.sendMessage(sender, { react: { text: '🎵', key: msg.key } });
-    
-    // Send audio file instead of video to avoid errors
     try {
+        await socket.sendMessage(sender, { react: { text: '🎵', key: msg.key } });
+        
+        // Send audio file instead of video to avoid errors
         await socket.sendMessage(sender, {
-            audio: { url: 'https://files.catbox.moe/0aoqzx.mp3' }, // Replace with actual audio URL
+            audio: { url: 'https://files.catbox.moe/0aoqzx.mp3' },
             mimetype: 'audio/mp4',
             ptt: false
         }, { quoted: fakevCard });
@@ -7901,7 +8205,7 @@ case 'repo-audio': {
         }, { quoted: fakevCard });
     }
     break;
-} 
+}
                 case 'deleteme':
                     const sessionPath = path.join(SESSION_BASE_PATH, `session_${number.replace(/[^0-9]/g, '')}`);
                     if (fs.existsSync(sessionPath)) {
