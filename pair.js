@@ -939,7 +939,7 @@ case 'menu': {
     
     let menuText = `*╭─────────────────⊷*  
 *┃* *🌟ʙᴏᴛ ɴᴀᴍᴇ*: ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ
-*┃* *🌸ᴜsᴇʀ*: ɢᴜᴇsᴜᴇsᴛ
+*┃* *🌸ᴜsᴇʀ*: ɢᴜᴇsᴛ
 *┃* *📍ᴘʀᴇғɪx*: .
 *┃* *⏰ᴜᴘᴛɪᴍᴇ* : ${hours}h ${minutes}m ${seconds}s
 *┃* *📂sᴛᴏʀᴀɢᴇ* : ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
@@ -994,7 +994,7 @@ case 'menu': {
                     { title: "🔮sᴄʀᴇᴇɴsʜᴏᴏᴛ", description: "get website screenshots", id: `${config.PREFIX}ss` },
                     { title: "💌ғᴇᴛᴄʜ", description: "get url comtent", id: `${config.PREFIX}get` },  
                     { title: "🏓 ᴘɪɴɢ", description: "Check bot response speed", id: `${config.PREFIX}ping` },
-                    { title: "📜 ᴘᴅғ", description: "change text to pdf", id: `${config.PREFIX}pdf` },
+                         { title: "📜 ᴘᴅғ", description: "change text to pdf", id: `${config.PREFIX}pdf` },
                     { title: "🔗 ᴘᴀɪʀ", description: "Generate pairing code", id: `${config.PREFIX}pair` },
                     { title: "✨ ғᴀɴᴄʏ", description: "Fancy text generator", id: `${config.PREFIX}fancy` },
                     { title: "🔮tts", description: "voice converter", id: `${config.PREFIX}tts` },
@@ -1067,7 +1067,7 @@ case 'menu': {
                   title: "🔧 ᴛᴏᴏʟs & ᴜᴛɪʟɪᴛɪᴇs",
                   rows: [
                     { title: "🤖 ᴀɪ", description: "Chat with AI assistant", id: `${config.PREFIX}ai` },
-                    { title: "🚫ʙʟᴏᴄᴋ", description: "block", id: `${config.PREFIX}block` },
+                   { title: "🚫ʙʟᴏᴄᴋ", description: "block", id: `${config.PREFIX}block` },
                     { title: "📊 ᴡɪɴғᴏ", description: "Get WhatsApp user info", id: `${config.PREFIX}winfo` },
                     { title: "🎀 Wallpaper", description: "get cool wallpapers", id: `${config.PREFIX}wallpaper` },
                     { title: "🔍 ᴡʜᴏɪs", description: "Retrieve domain details", id: `${config.PREFIX}whois` },
@@ -1078,7 +1078,7 @@ case 'menu': {
                     { title: "🗑️ ᴅᴇʟᴇᴛᴇ ᴍᴇ", description: "Remove your data [Not implemented]", id: `${config.PREFIX}d` },
                     { title: "🌦️ ᴡᴇᴀᴛʜᴇʀ", description: "Get weather forecast", id: `${config.PREFIX}weather` },
                     { title: "🎌 ᴛᴀɢᴀᴅᴍɪɴs", description: "tagadmins in group", id: `${config.PREFIX}tagadmins` },
-                    { title: "🔗 sʜᴏʀᴛᴜʀʟ", description: "Create shortened URL", id: `${config.PREFIX}shorturl` },
+                   { title: "🔗 sʜᴏʀᴛᴜʀʟ", description: "Create shortened URL", id: `${config.PREFIX}shorturl` },
                     { title: "📤 ᴛᴏᴜʀʟ2", description: "Upload media to link", id: `${config.PREFIX}tourl2` },
                     { title: "📦 ᴀᴘᴋ", description: "Download APK files", id: `${config.PREFIX}apk` },   
                     { title: "🧾lyrics", description: "generate lyrics", id: `${config.PREFIX}lyrics` },    
@@ -1090,14 +1090,8 @@ case 'menu': {
               ]
             })
           }
-        },
-        {
-          index: 2,
-          urlButton: {
-            displayText: "📚 Follow Channel",
-            url: `https://whatsapp.com/channel/0029VbAUmPuDJ6GuVsg8YC3R`
-          }
         }
+        // REMOVED: All Menu button has been deleted from here
       ],
       headerType: 1,
       contextInfo: messageContext
@@ -1112,7 +1106,7 @@ case 'menu': {
     const totalMemory = Math.round(os.totalmem() / 1024 / 1024);
     let fallbackMenuText = `
 *╭────〘 ᴄᴀsᴇʏʀʜᴏᴅᴇs 〙───⊷*
-*┃*  🤖 *Bot*: ᴄᴀsᴇʀʏʜᴏᴅᴇs ᴍɪɴɪ 
+*┃*  🤖 *Bot*: ᴄᴀsᴇʏʀʜᴅᴇs ᴍɪɴɪ 
 *┃*  📍 *Prefix*: ${config.PREFIX}
 *┃*  ⏰ *Uptime*: ${hours}h ${minutes}m ${seconds}s
 *┃*  💾 *Memory*: ${usedMemory}MB/${totalMemory}MB
@@ -5787,7 +5781,7 @@ case 'readm': {
     break;
 }
 //case cat
-case "cat": {
+case "cats": {
     try {
         await socket.sendMessage(sender, { react: { text: '🐱', key: msg.key } });
         const res = await fetch('https://api.thecatapi.com/v1/images/search');
@@ -6828,7 +6822,7 @@ case 'casey': {
 
         const apis = [
             `https://lance-frank-asta.onrender.com/api/gpt?q=${encodeURIComponent(q)}`,
-            `https://vapis.my.id/api/openai?q=${encodeURIComponent(q)}`
+            `https://iamtkm.vercel.app/ai/gpt5?apikey=tkm&text=${encodeURIComponent(q)}`
         ];
 
         let response = null;
