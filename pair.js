@@ -926,6 +926,7 @@ case 'info': {
 // Case: menu
   // Case: menu
 // Case: menu
+// Case: menu
 case 'menu': {
   try {
     await socket.sendMessage(sender, { react: { text: '✨', key: msg.key } });
@@ -943,6 +944,7 @@ case 'menu': {
 *┃* *📍ᴘʀᴇғɪx*: .
 *┃* *⏰ᴜᴘᴛɪᴍᴇ* : ${hours}h ${minutes}m ${seconds}s
 *┃* *📂sᴛᴏʀᴀɢᴇ* : ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
+*┃*  🔮 *ᴄᴏᴍᴍᴀɴᴅs*: ${count}
 *┃* *🎭ᴅᴇᴠ*: ᴄᴀsᴇʏʀʜᴏᴅᴇs xᴛᴇᴄʜ
 *╰──────────────────⊷*
 *\`Ξ ѕєlєct α cαtєgσrч вєlσw:\`*
@@ -967,12 +969,12 @@ case 'menu': {
       buttons: [
         {
           buttonId: `${config.PREFIX}quick_commands`,
-          buttonText: { displayText: '🚀 𝑺𝑬𝑳𝑬𝑪𝑻 𝑨 𝑪𝑨𝑻𝑬𝑮𝑶𝑹𝒀' },
+          buttonText: { displayText: '🤖 𝑺𝑬𝑳𝑬𝑪𝑻 𝑨 𝑪𝑨𝑻𝑬𝑮𝑶𝑹𝒀' },
           type: 4,
           nativeFlowInfo: {
             name: 'single_select',
             paramsJson: JSON.stringify({
-              title: '🚀 𝑺𝑬𝑳𝑬𝑪𝑻 𝑨 𝑪𝑨𝑻𝑬𝑮𝑶𝑹𝒀',
+              title: '🤖 𝑺𝑬𝑳𝑬𝑪𝑻 𝑨 𝑪𝑨𝑻𝑬𝑮𝑶𝑹𝒀',
               sections: [
                 {
                   title: "🌐 ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs",
@@ -1090,8 +1092,24 @@ case 'menu': {
               ]
             })
           }
+        },
+        // ADD THESE BUTTONS HERE - They were defined but not included in the menuMessage
+        {
+          buttonId: "quick_reply",
+          buttonText: { displayText: "💬 Message" },
+          type: 1
+        },
+        {
+          buttonId: "cta_copy",
+          buttonText: { displayText: "📋 Copy Number" },
+          type: 2
+        },
+        {
+          buttonId: "cta_url",
+          buttonText: { displayText: "📚 Follow Channel" },
+          type: 3,  // Changed to type 3 for URL button
+          url: "https://whatsapp.com/channel/0029Vb6TqBXGk1Ftb9397f0r"
         }
-        // REMOVED: All Menu button has been deleted from here
       ],
       headerType: 1,
       contextInfo: messageContext
