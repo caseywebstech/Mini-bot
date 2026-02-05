@@ -5,10 +5,11 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "postinstall": "echo 'Post-install script running'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "github:tenka-san/WaBails#main",
+    "@whiskeysockets/baileys": "github:WhiskeySockets/Baileys#multi-device",
     "express": "^4.18.2",
     "fs-extra": "^11.2.0",
     "fetch-json": "^3.2.0",
