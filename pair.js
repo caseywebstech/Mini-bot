@@ -924,8 +924,6 @@ case 'info': {
     break;
 }
 // Case: menu
-  // Case: menu
-// Case: menu
 // Case: menu
 case 'menu': {
   try {
@@ -951,7 +949,6 @@ case 'menu': {
 
 > ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ ッ
 `;
-
     // Common message context
     const messageContext = {
         forwardingScore: 1,
@@ -1092,24 +1089,9 @@ case 'menu': {
               ]
             })
           }
-        },
-        // ADD THESE BUTTONS HERE - They were defined but not included in the menuMessage
-        {
-          buttonId: "quick_reply",
-          buttonText: { displayText: "💬 Message" },
-          type: 1
-        },
-        {
-          buttonId: "cta_copy",
-          buttonText: { displayText: "📋 Copy Number" },
-          type: 2
-        },
-        {
-          buttonId: "cta_url",
-          buttonText: { displayText: "📚 Follow Channel" },
-          type: 3,  // Changed to type 3 for URL button
-          url: "https://whatsapp.com/channel/0029Vb6TqBXGk1Ftb9397f0r"
         }
+      
+        // REMOVED: All Menu button has been deleted from here
       ],
       headerType: 1,
       contextInfo: messageContext
@@ -7573,7 +7555,92 @@ case 'admins': {
     }
     break;
 }
+//case vcf
+case 'vcf': {
+  try {
+    // Check if it's a group
+    if (!from.includes('@g.us')) {
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      return socket.sendMessage(from, { 
+        text: '❌ This command only works in groups!'
+      }, { quoted: fakevCard });
+    }
 
+    // Get group metadata
+    const groupMetadata = await socket.groupMetadata(from);
+    const participants = groupMetadata.participants || [];
+    
+    // Validate group size
+    if (participants.length < 2) {
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      return socket.sendMessage(from, { 
+        text: '❌ Group must have at least 2 members' 
+      }, { quoted: fakevCard });
+    }
+    
+    if (participants.length > 1000) {
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      return socket.sendMessage(from, { 
+        text: '❌ Group is too large (max 1000 members)' 
+      }, { quoted: fakevCard });
+    }
+
+    await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
+
+    // Generate VCF content
+    let vcfContent = '';
+    participants.forEach(participant => {
+      const phoneNumber = participant.id.split('@')[0];
+      const displayName = participant.notify || `User_${phoneNumber}`;
+      
+      vcfContent += `BEGIN:VCARD\n` +
+                    `VERSION:3.0\n` +
+                    `FN:${displayName}\n` +
+                    `TEL;TYPE=CELL:+${phoneNumber}\n` +
+                    `NOTE:From ${groupMetadata.subject}\n` +
+                    `END:VCARD\n\n`;
+    });
+
+    // Create temp file
+    const sanitizedGroupName = groupMetadata.subject.replace(/[^\w]/g, '_');
+    const tempDir = path.join(__dirname, '../temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    const vcfPath = path.join(tempDir, `${sanitizedGroupName}_${Date.now()}.vcf`);
+    fs.writeFileSync(vcfPath, vcfContent);
+
+    // Send VCF file
+    await socket.sendMessage(from, {
+      document: fs.readFileSync(vcfPath),
+      mimetype: 'text/vcard',
+      fileName: `${sanitizedGroupName}_contacts.vcf`,
+      caption: `📇 *Group Contacts*\n\n` +
+               `• Group: ${groupMetadata.subject}\n` +
+               `• Members: ${participants.length}\n` +
+               `• Generated: ${new Date().toLocaleString()}\n\n` +
+               `📁 *File contains ${participants.length} contacts*`
+    }, { quoted: fakevCard });
+
+    // Cleanup
+    setTimeout(() => {
+      if (fs.existsSync(vcfPath)) {
+        fs.unlinkSync(vcfPath);
+      }
+    }, 5000);
+
+    await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+  } catch (error) {
+    console.error('❌ VCF Error:', error);
+    await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    await socket.sendMessage(from, { 
+      text: '❌ Failed to generate VCF file. Please try again later.' 
+    }, { quoted: fakevCard });
+  }
+  break;
+}
 // Helper case for members list
 case 'members': {
     try {
@@ -8266,15 +8333,14 @@ case 'climate': {
         break;
     }
       //case repository 
-//case repository 
+      //case repository 
 case 'repo':
 case 'sc':
 case 'script': {
     try {
         await socket.sendMessage(sender, { react: { text: '🪄', key: msg.key } });
-        const githubRepoURL = 'https://github.com/caseyweb/CASEYRHODES-XMD';
         
-        // Make sure fetch is available (add if using Node.js)
+        // Get repo info from GitHub API
         const response = await fetch(`https://api.github.com/repos/caseyweb/CASEYRHODES-XMD`);
         
         if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
@@ -8284,87 +8350,130 @@ case 'script': {
         const formattedInfo = `
 *🎀 𝐂𝐀𝐒𝐄𝐘𝐑𝐇𝐎𝐃𝐄𝐒 𝐌𝐈𝐍𝐈 🎀*
 *╭──────────────⊷*
-*┃* *ɴᴀᴍᴇ*   : ${repoData.name}
-*┃* *sᴛᴀʀs*    : ${repoData.stargazers_count}
-*┃* *ғᴏʀᴋs*    : ${repoData.forks_count}
-*┃* *ᴏᴡɴᴇʀ*   : ᴄᴀsᴇʏʀʜᴏᴅᴇs
-*┃* *ᴅᴇsᴄ* : ${repoData.description || 'ɴ/ᴀ'}
+*┃* *ɴᴀᴍᴇ*        : ${repoData.name}
+*┃* *sᴛᴀʀs*       : ${repoData.stargazers_count}
+*┃* *ғᴏʀᴋs*       : ${repoData.forks_count}
+*┃* *ᴏᴡɴᴇʀ*       : ᴄᴀsᴇʏʀʜᴏᴅᴇs
+*┃* *ᴅᴇsᴄ*        : ${repoData.description || 'ɴ/ᴀ'}
 *╰──────────────⊷*
-`;
 
-        const imageContextInfo = {
-            forwardingScore: 1,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-                newsletterJid: '120363420261263259@newsletter',
-                newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
-                serverMessageId: -1
-            }
-        };
+📁 *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ*
+`;
 
         const repoMessage = {
             image: { url: 'https://i.ibb.co/fGSVG8vJ/caseyweb.jpg' },
             caption: formattedInfo,
-            contextInfo: imageContextInfo,
+            contextInfo: {
+                forwardingScore: 1,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: '120363420261263259@newsletter',
+                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
+                    serverMessageId: -1
+                }
+            },
             buttons: [
                 {
-                    buttonId: `${config.PREFIX || '!'}repo-visit`,
+                    buttonId: `${config.PREFIX}repo-visit`,
                     buttonText: { displayText: '🌐 Visit Repo' },
                     type: 1
                 },
                 {
-                    buttonId: `${config.PREFIX || '!'}repo-owner`,
+                    buttonId: `${config.PREFIX}repo-owner`,
                     buttonText: { displayText: '👑 Owner Profile' },
                     type: 1
                 },
                 {
-                    buttonId: `${config.PREFIX || '!'}repo-audio`,
+                    buttonId: `${config.PREFIX}repo-audio`,
                     buttonText: { displayText: '🎵 Play Intro' },
                     type: 1
                 }
             ]
         };
 
-        await socket.sendMessage(sender, repoMessage, { quoted: fakevCard });
+        await socket.sendMessage(from, repoMessage, { quoted: fakevCard });
 
     } catch (error) {
         console.error("❌ Error in repo command:", error);
-        await socket.sendMessage(sender, { 
-            text: "⚠️ Failed to fetch repo info. Please try again later." 
-        }, { quoted: fakevCard });
+        // Fallback if API fails
+        const fallbackInfo = `
+*🎀 𝐂𝐀𝐒𝐄𝐘𝐑𝐇𝐎𝐃𝐄𝐒 𝐌𝐈𝐍𝐈 🎀*
+*╭──────────────⊷*
+*┃* *ɴᴀᴍᴇ*        : CASEYRHODES-XMD
+*┃* *sᴛᴀʀs*       : Loading...
+*┃* *ғᴏʀᴋs*       : Loading...
+*┃* *ᴏᴡɴᴇʀ*       : ᴄᴀsᴇʏʀʜᴏᴅᴇs
+*┃* *ᴅᴇsᴄ*        : WhatsApp Multi-Device Bot
+*╰──────────────⊷*
+
+📁 *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ*
+`;
+        
+        const fallbackMessage = {
+            image: { url: 'https://i.ibb.co/fGSVG8vJ/caseyweb.jpg' },
+            caption: fallbackInfo,
+            contextInfo: {
+                forwardingScore: 1,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: '120363420261263259@newsletter',
+                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
+                    serverMessageId: -1
+                }
+            },
+            buttons: [
+                {
+                    buttonId: `${config.PREFIX}repo-visit`,
+                    buttonText: { displayText: '🌐 Visit Repo' },
+                    type: 1
+                },
+                {
+                    buttonId: `${config.PREFIX}repo-owner`,
+                    buttonText: { displayText: '👑 Owner Profile' },
+                    type: 1
+                },
+                {
+                    buttonId: `${config.PREFIX}repo-audio`,
+                    buttonText: { displayText: '🎵 Play Intro' },
+                    type: 1
+                }
+            ]
+        };
+        
+        await socket.sendMessage(from, fallbackMessage, { quoted: fakevCard });
     }
     break;
 }
 
+// Button handlers for repo
 case 'repo-visit': {
     try {
         await socket.sendMessage(sender, { react: { text: '🌐', key: msg.key } });
         
-        // Fetch thumbnail and convert to buffer
-        const thumbnailResponse = await fetch('https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png');
-        if (!thumbnailResponse.ok) throw new Error('Failed to fetch thumbnail');
-        
-        const thumbnailArrayBuffer = await thumbnailResponse.arrayBuffer();
-        const thumbnailBuffer = Buffer.from(thumbnailArrayBuffer);
-        
-        await socket.sendMessage(sender, {
-            text: `🌐 *Click to visit the repo:*\nhttps://github.com/caseyweb/CASEYRHODES-XMD`,
-            contextInfo: {
-                externalAdReply: {
-                    title: 'Visit Repository',
-                    body: 'Open in browser',
-                    thumbnail: thumbnailBuffer,
-                    mediaType: 1,
-                    mediaUrl: 'https://github.com/caseyweb/CASEYRHODES-XMD',
-                    sourceUrl: 'https://github.com/caseyweb/CASEYRHODES-XMD',
-                    renderLargerThumbnail: false
+        // Create button message with link
+        const visitMessage = {
+            text: `🌐 *Click the button below to visit the repository:*`,
+            buttons: [
+                {
+                    urlButton: {
+                        displayText: '🌟 Visit GitHub Repo',
+                        url: 'https://github.com/caseyweb/CASEYRHODES-XMD'
+                    }
+                },
+                {
+                    quickReplyButton: {
+                        displayText: '📋 Back to Menu',
+                        id: `${config.PREFIX}menu`
+                    }
                 }
-            }
-        }, { quoted: fakevCard });
+            ]
+        };
+        
+        await socket.sendMessage(from, visitMessage, { quoted: fakevCard });
     } catch (error) {
         console.error("Error in repo-visit:", error);
-        await socket.sendMessage(sender, {
-            text: "🌐 *Click to visit the repo:*\nhttps://github.com/caseyweb/CASEYRHODES-XMD"
+        await socket.sendMessage(from, {
+            text: `🌐 *Repository Link:*\nhttps://github.com/caseyweb/CASEYRHODES-XMD`
         }, { quoted: fakevCard });
     }
     break;
@@ -8374,31 +8483,30 @@ case 'repo-owner': {
     try {
         await socket.sendMessage(sender, { react: { text: '👑', key: msg.key } });
         
-        // Fetch thumbnail and convert to buffer
-        const thumbnailResponse = await fetch('https://i.ibb.co/fGSVG8vJ/caseyweb.jpg');
-        if (!thumbnailResponse.ok) throw new Error('Failed to fetch thumbnail');
-        
-        const thumbnailArrayBuffer = await thumbnailResponse.arrayBuffer();
-        const thumbnailBuffer = Buffer.from(thumbnailArrayBuffer);
-        
-        await socket.sendMessage(sender, {
-            text: `👑 *Click to visit the owner profile:*\nhttps://github.com/caseyweb`,
-            contextInfo: {
-                externalAdReply: {
-                    title: 'Owner Profile',
-                    body: 'Open in browser',
-                    thumbnail: thumbnailBuffer,
-                    mediaType: 1,
-                    mediaUrl: 'https://github.com/caseyweb',
-                    sourceUrl: 'https://github.com/caseyweb',
-                    renderLargerThumbnail: false
+        // Create button message with link
+        const ownerMessage = {
+            text: `👑 *Click the button below to visit the owner's profile:*`,
+            buttons: [
+                {
+                    urlButton: {
+                        displayText: '👤 Visit Owner Profile',
+                        url: 'https://github.com/caseyweb'
+                    }
+                },
+                {
+                    quickReplyButton: {
+                        displayText: '📋 Back to Menu',
+                        id: `${config.PREFIX}menu`
+                    }
                 }
-            }
-        }, { quoted: fakevCard });
+            ]
+        };
+        
+        await socket.sendMessage(from, ownerMessage, { quoted: fakevCard });
     } catch (error) {
         console.error("Error in repo-owner:", error);
-        await socket.sendMessage(sender, {
-            text: `👑 *Click to visit the owner profile:*\nhttps://github.com/caseyweb`
+        await socket.sendMessage(from, {
+            text: `👑 *Owner Profile:*\nhttps://github.com/caseyweb`
         }, { quoted: fakevCard });
     }
     break;
@@ -8408,16 +8516,27 @@ case 'repo-audio': {
     try {
         await socket.sendMessage(sender, { react: { text: '🎵', key: msg.key } });
         
-        // Send audio file instead of video to avoid errors
-        await socket.sendMessage(sender, {
-            audio: { url: 'https://files.catbox.moe/0aoqzx.mp3' },
-            mimetype: 'audio/mp4',
-            ptt: false
+        // First send a loading message
+        await socket.sendMessage(from, {
+            text: '🎵 *Preparing audio introduction...*'
         }, { quoted: fakevCard });
+        
+        // Send audio file
+        await socket.sendMessage(from, {
+            audio: { url: 'https://files.catbox.moe/z47dgd.mp3' },
+            mimetype: 'audio/mp4',
+            ptt: true,
+            caption: '🎵 *CaseyRhodes Tech Audio Introduction*'
+        }, { quoted: fakevCard });
+        
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+        
     } catch (audioError) {
         console.error("Audio error:", audioError);
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
         // Fallback to text if audio fails
-        await socket.sendMessage(sender, {
+        await socket.sendMessage(from, {
             text: "🎵 *Audio Introduction*\n\nSorry, the audio is currently unavailable. Please try again later."
         }, { quoted: fakevCard });
     }
