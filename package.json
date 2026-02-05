@@ -8,7 +8,6 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-"dependencies": {
   "@whiskeysockets/baileys": "github:Davex-254/davebaileys",
     "express": "^4.18.2",
     "fs-extra": "^11.2.0",
