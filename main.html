@@ -149,12 +149,183 @@
             70% { transform: scale(1.2); opacity: 1; }
             100% { transform: scale(1); opacity: 1; }
         }
+
+        /* Flower Animation Styles */
+        .flower-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            overflow: hidden;
+        }
+
+        .falling-flower {
+            position: absolute;
+            font-size: 25px;
+            opacity: 0;
+            pointer-events: auto;
+            cursor: grab;
+            user-select: none;
+            z-index: 2;
+        }
+
+        .falling-flower.grabbed {
+            cursor: grabbing;
+            z-index: 9999;
+            filter: drop-shadow(0 5px 15px rgba(255, 0, 85, 0.5));
+        }
+
+        @keyframes fall {
+            0% {
+                opacity: 1;
+                transform: translateY(-100px) rotate(0deg);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(100vh) rotate(360deg);
+            }
+        }
+
+        /* Music Player Styles */
+        .music-player {
+            position: fixed;
+            left: 20px;
+            bottom: 70px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .music-btn {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #ec4899, #c084fc);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 5px 25px rgba(236, 72, 153, 0.4);
+            transition: all 0.3s;
+            border: none;
+            font-size: 20px;
+            color: white;
+            animation: pulse-music 2s ease-in-out infinite;
+        }
+
+        .music-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .music-btn.playing {
+            animation: spin 3s linear infinite, pulse-music 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-music {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 5px 25px rgba(236, 72, 153, 0.4);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 8px 35px rgba(236, 72, 153, 0.6);
+            }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .flower-selector {
+            width: 46px;
+            height: 46px;
+            background: linear-gradient(135deg, #7e22ce, #c084fc);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(126, 34, 206, 0.4);
+            transition: all 0.3s;
+            border: none;
+            font-size: 18px;
+            color: white;
+        }
+
+        .flower-selector:hover {
+            transform: scale(1.1);
+        }
+
+        .flower-menu {
+            position: absolute;
+            bottom: 55px;
+            left: 0;
+            background: rgba(20, 20, 20, 0.95);
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(126, 34, 206, 0.3);
+            border-radius: 12px;
+            padding: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 6px;
+            z-index: 10000;
+        }
+
+        .flower-menu.active {
+            display: flex;
+        }
+
+        .flower-option {
+            background: rgba(126, 34, 206, 0.1);
+            border: 1px solid rgba(126, 34, 206, 0.2);
+            border-radius: 8px;
+            padding: 6px 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 16px;
+            text-align: center;
+            color: white;
+        }
+
+        .flower-option:hover {
+            background: rgba(126, 34, 206, 0.3);
+            transform: scale(1.1);
+        }
     </style>
 </head>
 <body class="p-4">
 
 <canvas id="particle-canvas"></canvas>
 <div id="stars-container"></div>
+
+<!-- Flower Container -->
+<div class="flower-container" id="flowerContainer"></div>
+
+<!-- Music Player -->
+<div class="music-player">
+    <button class="music-btn" id="musicBtn">🎵</button>
+    <div style="position: relative;">
+        <button class="flower-selector" id="flowerSelector">🌸</button>
+        <div class="flower-menu" id="flowerMenu">
+            <div class="flower-option" data-flower="🌸">🌸</div>
+            <div class="flower-option" data-flower="🌺">🌺</div>
+            <div class="flower-option" data-flower="🌼">🌼</div>
+            <div class="flower-option" data-flower="🌻">🌻</div>
+            <div class="flower-option" data-flower="🌹">🌹</div>
+            <div class="flower-option" data-flower="💐">💐</div>
+            <div class="flower-option" data-flower="🌷">🌷</div>
+            <div class="flower-option" data-flower="🏵️">🏵️</div>
+        </div>
+    </div>
+</div>
+
+<!-- Audio Element -->
+<audio id="bgMusic" loop></audio>
 
 <a href="https://wa.me/+254704472907" class="fixed top-5 left-5 z-20 flex items-center space-x-2 text-sm text-gray-400 hover:text-gray-300 transition-colors duration-300 group" title="Back to main website">
     <i class="fas fa-chevron-left transform group-hover:-translate-x-0.5 transition-transform duration-150"></i>
@@ -193,7 +364,7 @@
             <p class="text-gray-500 text-xs">Please wait.</p>
         </div>
 
-     <div id="code-section" class="hidden text-center">
+        <div id="code-section" class="hidden text-center">
             <h2 class="text-center text-xl font-semibold text-white">Your Pairing Code</h2>
             <p class="text-center text-gray-400 text-sm mt-2">Don't Share This Code With Anyone</p>
 
@@ -360,6 +531,184 @@
     createStars();
     animateParticles();
 
+    // ============ FLOWER ANIMATION LOGIC ============
+    let selectedFlower = '🌸';
+    const flowerSelector = document.getElementById('flowerSelector');
+    const flowerMenu = document.getElementById('flowerMenu');
+    const flowerOptions = document.querySelectorAll('.flower-option');
+    const flowerContainer = document.getElementById('flowerContainer');
+
+    flowerSelector.addEventListener('click', function(e) {
+        e.stopPropagation();
+        flowerMenu.classList.toggle('active');
+    });
+
+    flowerOptions.forEach(option => {
+        option.addEventListener('click', function(e) {
+            e.stopPropagation();
+            selectedFlower = this.dataset.flower;
+            flowerSelector.textContent = selectedFlower;
+            flowerMenu.classList.remove('active');
+        });
+    });
+
+    document.addEventListener('click', function() {
+        flowerMenu.classList.remove('active');
+    });
+
+    class Flower {
+        constructor() {
+            this.element = document.createElement('div');
+            this.element.className = 'falling-flower';
+            this.element.textContent = selectedFlower;
+            
+            this.startX = Math.random() * window.innerWidth;
+            this.element.style.left = this.startX + 'px';
+            this.element.style.fontSize = (Math.random() * 15 + 20) + 'px';
+            this.element.style.color = `hsl(${Math.random() * 360}, 70%, 65%)`;
+            
+            this.duration = (Math.random() * 3 + 5) + 's';
+            this.element.style.animation = `fall ${this.duration} linear forwards`;
+            
+            this.isDragging = false;
+            this.setupDragEvents();
+            
+            flowerContainer.appendChild(this.element);
+            
+            setTimeout(() => {
+                if (!this.isDragging && this.element.parentNode) {
+                    this.element.remove();
+                }
+            }, parseFloat(this.duration) * 1000);
+        }
+
+        setupDragEvents() {
+            const onStart = (e) => {
+                e.preventDefault();
+                this.isDragging = true;
+                this.element.classList.add('grabbed');
+                
+                const computedStyle = window.getComputedStyle(this.element);
+                const matrix = new DOMMatrix(computedStyle.transform);
+                this.element.style.animation = 'none';
+                this.element.style.top = matrix.m42 + 'px';
+                this.element.style.left = matrix.m41 + 'px';
+                this.element.style.transform = 'none';
+                
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                
+                this.dragOffsetX = clientX - parseFloat(this.element.style.left);
+                this.dragOffsetY = clientY - parseFloat(this.element.style.top);
+            };
+
+            const onMove = (e) => {
+                if (!this.isDragging) return;
+                
+                const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+                const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+                
+                this.element.style.left = (clientX - this.dragOffsetX) + 'px';
+                this.element.style.top = (clientY - this.dragOffsetY) + 'px';
+            };
+
+            const onEnd = () => {
+                if (!this.isDragging) return;
+                this.isDragging = false;
+                this.element.classList.remove('grabbed');
+                
+                const currentTop = parseFloat(this.element.style.top);
+                const remainingDistance = window.innerHeight - currentTop;
+                const remainingTime = (remainingDistance / window.innerHeight) * parseFloat(this.duration);
+                
+                this.element.style.animation = `fall ${remainingTime}s linear forwards`;
+                
+                setTimeout(() => {
+                    if (this.element.parentNode) {
+                        this.element.remove();
+                    }
+                }, remainingTime * 1000);
+            };
+
+            this.element.addEventListener('mousedown', onStart);
+            this.element.addEventListener('touchstart', onStart, { passive: false });
+            
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('touchmove', onMove, { passive: false });
+            
+            document.addEventListener('mouseup', onEnd);
+            document.addEventListener('touchend', onEnd);
+        }
+    }
+
+    // Start flower animation
+    setInterval(() => {
+        new Flower();
+    }, 300);
+
+    // ============ MUSIC PLAYER LOGIC ============
+    const songs = [
+        'https://files.catbox.moe/x31ls3.mp3',
+        'https://files.catbox.moe/jydlzs.mp3',
+        'https://files.catbox.moe/2cbngz.mp3'
+    ];
+
+    const bgMusic = document.getElementById('bgMusic');
+    const musicBtn = document.getElementById('musicBtn');
+    let isMusicPlaying = false;
+
+    function playRandomSong() {
+        const randomSong = songs[Math.floor(Math.random() * songs.length)];
+        bgMusic.src = randomSong;
+        bgMusic.volume = 0.3;
+        bgMusic.play().then(() => {
+            isMusicPlaying = true;
+            musicBtn.classList.add('playing');
+            musicBtn.textContent = '⏸️';
+        }).catch(err => {
+            console.log('Autoplay prevented:', err);
+        });
+    }
+
+    musicBtn.addEventListener('click', function() {
+        if (isMusicPlaying) {
+            bgMusic.pause();
+            musicBtn.textContent = '🎵';
+            musicBtn.classList.remove('playing');
+            isMusicPlaying = false;
+        } else {
+            if (!bgMusic.src || bgMusic.ended) {
+                playRandomSong();
+            } else {
+                bgMusic.play();
+                musicBtn.textContent = '⏸️';
+                musicBtn.classList.add('playing');
+                isMusicPlaying = true;
+            }
+        }
+    });
+
+    bgMusic.addEventListener('ended', () => {
+        playRandomSong();
+    });
+
+    // Auto-start music on first interaction
+    let firstInteraction = true;
+    document.addEventListener('click', () => {
+        if (firstInteraction && !isMusicPlaying) {
+            playRandomSong();
+            firstInteraction = false;
+        }
+    }, { once: true });
+
+    document.addEventListener('touchstart', () => {
+        if (firstInteraction && !isMusicPlaying) {
+            playRandomSong();
+            firstInteraction = false;
+        }
+    }, { once: true });
+
+    // ============ ORIGINAL PAIRING LOGIC ============
     const generateBtn = document.getElementById("generate-btn");
     const phoneInput = document.getElementById("phone");
     const codeSection = document.getElementById("code-section");
