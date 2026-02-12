@@ -15,6 +15,8 @@ const crypto = require('crypto');
 const axios = require('axios');
 const FormData = require("form-data");
 const os = require('os'); 
+const { tmpdir } = require('os');
+const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const { sms, downloadMediaMessage } = require("./msg");
 const {
     default: makeWASocket,
@@ -2767,7 +2769,7 @@ case 'mp3play': {
     // Show processing message
     await socket.sendMessage(from, { text: "*📥 Downloading MP3... Please wait*" }, { quoted: msg });
     
-    const apiUrl = `https://api.goodnesstechhost.xyz/download/youtube/audio?url=${encodeURIComponent(url)}`;
+    const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(url)}`;
     const { data } = await axios.get(apiUrl, { timeout: 30000 });
 
     if (!data || !data.url) {
@@ -2799,7 +2801,7 @@ case 'mp3doc': {
   try {
     await socket.sendMessage(from, { text: "*📥 Downloading as document... Please wait*" }, { quoted: msg });
     
-    const apiUrl = `https://api.goodnesstechhost.xyz/download/youtube/audio?url=${encodeURIComponent(url)}`;
+    const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(url)}`;
     const { data } = await axios.get(apiUrl, { timeout: 30000 });
 
     if (!data || !data.url) {
@@ -2851,6 +2853,101 @@ case 'mp3ptt': {
   }
 
   break;
+}
+case 'play2':
+case 'music':
+case 'ytmp3': {
+    try {
+        const query = args.join(" ");
+        
+        if (!query) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: `🎵 *Download audio from YouTube*\n\n*Usage:* ${config.PREFIX}song <song name>\n*Example:* ${config.PREFIX}song perfect ed sheeran`
+            }, { quoted: fakevCard });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🔍', key: msg.key } });
+
+        // Search on YouTube
+        const { videos } = await yts(query);
+        
+        if (!videos || videos.length === 0) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: `❌ No results found for "${query}"`
+            }, { quoted: fakevCard });
+        }
+
+        const video = videos[0];
+        const videoUrl = video.url;
+        const videoTitle = video.title;
+        const videoDuration = video.timestamp || 'Unknown';
+        const videoViews = video.views ? video.views.toLocaleString() : 'Unknown';
+        const videoUploaded = video.uploadedAt || 'Unknown';
+        const videoAuthor = video.author?.name || 'Unknown';
+        const videoDescription = video.description?.slice(0, 200) || 'No description available';
+        const videoThumbnail = video.thumbnail || 'https://i.ibb.co/fGSVG8vJ/caseyweb.jpg';
+
+        // Download audio
+        const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(videoUrl)}`;
+        const response = await axios.get(apiUrl, { timeout: 30000 });
+
+        if (!response.data?.status || !response.data.audio) {
+            throw new Error('Failed to get audio URL');
+        }
+
+        const audioUrl = response.data.audio;
+
+        // Send song description with image AND button in ONE message
+        await socket.sendMessage(from, {
+            image: { url: videoThumbnail },
+            caption: `🎵 *${videoTitle}*\n\n` +
+                    `👤 *Artist:* ${videoAuthor}\n` +
+                    `⏱️ *Duration:* ${videoDuration}\n` +
+                    `👁️ *Views:* ${videoViews}\n` +
+                    `📅 *Uploaded:* ${videoUploaded}\n\n` +
+                    `📝 *Description:*\n${videoDescription}...\n\n` +
+                    `⬇️ *Sending audio...*`,
+            buttons: [
+                {
+                    urlButton: {
+                        displayText: "▶️ Watch on YouTube",
+                        url: videoUrl
+                    }
+                }
+            ],
+            contextInfo: {
+                forwardingScore: 1,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: '120363420261263259@newsletter',
+                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
+                    serverMessageId: -1
+                }
+            }
+        }, { quoted: fakevCard });
+
+        // Send as AUDIO
+        await socket.sendMessage(from, {
+            audio: { url: audioUrl },
+            mimetype: 'audio/mpeg',
+            ptt: false,
+            caption: `🎵 ${videoTitle}`
+        }, { quoted: fakevCard });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('❌ Song Download Error:', error);
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
+        await socket.sendMessage(from, {
+            text: `❌ Download failed: ${error.message || 'API error'}`
+        }, { quoted: fakevCard });
+    }
+    break;
 }
 //video case
 //=====[VIDEO COMMAND]================//
@@ -3646,163 +3743,124 @@ case 'search': {
   break;
 }
 //image case 
+// Pinterest Image Search Command
 case 'img':
 case 'image':
-case 'googleimage':
-case 'searchimg': {
-    // React to the command first
-    await socket.sendMessage(sender, {
-        react: {
-            text: "🦋",
-            key: msg.key
-        }
-    });
-
-    const axios = require("axios");
-    const prefix = global.prefix || '.'; // Get the prefix from your global settings
-
+case 'pinterest':
+case 'pin': {
     try {
-        // Extract search query from message - fixed extraction
-        let q = '';
-        if (msg.message?.conversation) {
-            q = msg.message.conversation;
-        } else if (msg.message?.extendedTextMessage?.text) {
-            q = msg.message.extendedTextMessage.text;
-        } else if (msg.message?.imageMessage?.caption) {
-            q = msg.message.imageMessage.caption;
-        }
-
-        // Remove prefix from the message
-        const queryText = q.startsWith(prefix) ? q.slice(prefix.length).trim() : q.trim();
+        const query = args.join(" ");
         
-        // Extract command and query properly
-        const parts = queryText.split(' ');
-        const command = parts[0];
-        const query = parts.slice(1).join(' ').trim();
-
         if (!query) {
-            return await socket.sendMessage(sender, {
-                text: `🖼️ *Please provide a search query*\n*Example:* ${prefix}img cute cats`,
-                buttons: [
-                    { buttonId: `${prefix}allmenu`, buttonText: { displayText: '🌟 ᴀʟʟᴍᴇɴᴜ' }, type: 1 },
-                    { buttonId: `${prefix}img cute cats`, buttonText: { displayText: '🐱 ᴇxᴀᴍᴘʟᴇ sᴇᴀʀᴄʜ' }, type: 1 }
-                ]
-            }, { quoted: msg });
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: `🖼️ *Please provide search keywords*\n\n*Example:* ${config.PREFIX}img hacker setup`
+            }, { quoted: fakevCard });
         }
 
+        await socket.sendMessage(sender, { react: { text: '🔍', key: msg.key } });
+        
         // Send searching message
-        await socket.sendMessage(sender, {
-            text: `> 🔍 *Searching images for:* "${query}"...`
-        }, { quoted: msg });
+        await socket.sendMessage(from, {
+            text: `🔍 *Searching images for:* "${query}"\n⏳ Please wait...`
+        }, { quoted: fakevCard });
 
-        // Fixed API URL with proper error handling
-        const url = `https://iamtkm.vercel.app/api/img?query=${encodeURIComponent(query)}`;
+        const apiUrl = `https://christus-api.vercel.app/image/Pinterest?query=${encodeURIComponent(query)}&limit=10`;
         
-        const response = await axios.get(url, { 
-            timeout: 15000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
+        const response = await axios.get(apiUrl, { timeout: 15000 });
 
-        // Validate response structure
-        if (!response.data || (!response.data.results && !response.data.data)) {
-            console.log('Unexpected API response structure:', response.data);
-            throw new Error('Invalid API response structure');
-        }
-
-        // Handle different response formats
-        const results = response.data.results || response.data.data || response.data;
-        
-        if (!Array.isArray(results) || results.length === 0) {
-            return await socket.sendMessage(sender, {
-                text: "❌ *No images found.* Try different keywords",
-                buttons: [
-                    { buttonId: `${prefix}allmenu`, buttonText: { displayText: '🏠 ᴀʟʟᴍᴇɴᴜ' }, type: 1 },
-                    { buttonId: `${prefix}img ${query}`, buttonText: { displayText: '🔄 ᴛʀʏ ᴀɢᴀɪɴ' }, type: 1 }
-                ]
-            }, { quoted: msg });
+        if (!response.data || !response.data.status || !Array.isArray(response.data.results) || response.data.results.length === 0) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: '❌ *No images found* for your search query.'
+            }, { quoted: fakevCard });
         }
 
         // Filter valid image URLs
-        const validImages = results.filter(img => {
-            if (typeof img === 'string') {
-                return img.startsWith('http') && (img.endsWith('.jpg') || img.endsWith('.jpeg') || img.endsWith('.png') || img.includes('google'));
-            } else if (typeof img === 'object' && img.url) {
-                return img.url.startsWith('http') && (img.url.endsWith('.jpg') || img.url.endsWith('.jpeg') || img.url.endsWith('.png') || img.url.includes('google'));
-            }
-            return false;
-        });
+        const images = response.data.results
+            .filter(item => 
+                item.imageUrl && 
+                /\.(jpg|jpeg|png|webp)$/i.test(item.imageUrl)
+            )
+            .slice(0, 5); // Get first 5 images
 
-        if (validImages.length === 0) {
-            return await socket.sendMessage(sender, {
-                text: "❌ *No valid images found.* Try different keywords",
-                buttons: [
-                    { buttonId: `${prefix}allmenu`, buttonText: { displayText: '🏠 ᴀʟʟᴍᴇɴᴜ' }, type: 1 },
-                    { buttonId: `${prefix}img`, buttonText: { displayText: '🔄 ᴛʀʏ ᴀɢᴀɪɴ' }, type: 1 }
-                ]
-            }, { quoted: msg });
+        if (images.length === 0) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: '❌ *No valid images found* for your search query.'
+            }, { quoted: fakevCard });
         }
 
-        // Get 3 random images
-        const selectedImages = validImages
-            .sort(() => 0.5 - Math.random())
-            .slice(0, 3)
-            .map(img => typeof img === 'string' ? img : img.url);
+        // Send found count
+        await socket.sendMessage(from, {
+            text: `✅ *Found ${images.length} images*\n📤 Sending...`
+        }, { quoted: fakevCard });
 
-        let sentCount = 0;
-        
-        for (const imageUrl of selectedImages) {
+        // Send each image with caption
+        for (let i = 0; i < images.length; i++) {
             try {
-                await socket.sendMessage(
-                    sender,
-                    { 
-                        image: { url: imageUrl },
-                        caption: `📷 *Image Search Result*\n🔍 *Query:* ${query}\n📊 *Result:* ${sentCount + 1}/${selectedImages.length}\n\n✨ *Powered by CaseyRhodes-XMD*`,
-                        buttons: [
-                            { buttonId: `${prefix}allmenu`, buttonText: { displayText: '📱 ᴀʟʟᴍᴇɴᴜ' }, type: 1 },
-                            { buttonId: `${prefix}img ${query}`, buttonText: { displayText: '🔄 ᴍᴏʀᴇ ɪᴍᴀɢᴇs' }, type: 1 }
-                        ]
-                    },
-                    { quoted: msg }
-                );
+                const image = images[i];
+                const title = image.title && image.title !== "No title" ? image.title : query;
                 
-                sentCount++;
+                await socket.sendMessage(from, {
+                    image: { url: image.imageUrl },
+                    caption: `🖼️ *Pinterest Image* ${i + 1}/${images.length}\n\n` +
+                            `📌 *Search:* ${query}\n` +
+                            `📝 *Title:* ${title}\n\n` +
+                            `> ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ 🎀`,
+                    contextInfo: {
+                        forwardingScore: 1,
+                        isForwarded: true,
+                        forwardedNewsletterMessageInfo: {
+                            newsletterJid: '120363420261263259@newsletter',
+                            newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
+                            serverMessageId: -1
+                        }
+                    }
+                }, { quoted: fakevCard });
                 
-                // Add delay between sends to avoid rate limiting
-                if (sentCount < selectedImages.length) {
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                }
+                // Delay between images to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 
-            } catch (imageError) {
-                console.error('Failed to send image:', imageError);
-                // Continue with next image if one fails
+            } catch (err) {
+                console.log(`❌ Failed to send image ${i + 1}:`, err.message);
+                continue; // Skip failed images and continue with next
             }
         }
 
-        // Completion message has been removed as requested
+        // Send ONLY buttons without success message
+        await socket.sendMessage(from, {
+            text: " ",
+            buttons: [
+                {
+                    quickReplyButton: {
+                        displayText: "🔍 Search Again",
+                        id: `${config.PREFIX}img ${query}`
+                    }
+                },
+                {
+                    quickReplyButton: {
+                        displayText: "📋 Main Menu",
+                        id: `${config.PREFIX}menu`
+                    }
+                }
+            ]
+        }, { quoted: fakevCard });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
 
     } catch (error) {
-        console.error('Image Search Error:', error);
+        console.error("❌ Pinterest Image Error:", error.message);
         
-        let errorMessage = "Failed to fetch images";
-        if (error.code === 'ECONNABORTED') {
-            errorMessage = "Request timeout - server took too long to respond";
-        } else if (error.response?.status === 404) {
-            errorMessage = "Image API endpoint not found";
-        } else if (error.response?.status >= 500) {
-            errorMessage = "Image search service is currently unavailable";
-        } else if (error.message) {
-            errorMessage = error.message;
-        }
-
-        await socket.sendMessage(sender, {
-            text: `❌ *Search Failed*\n⚠️ *Error:* ${errorMessage}`,
-            buttons: [
-                { buttonId: `${prefix}allmenu`, buttonText: { displayText: '🏠 ᴀʟʟᴍᴇɴᴜ' }, type: 1 },
-                { buttonId: `${prefix}img`, buttonText: { displayText: '🔄 ᴛʀʏ ᴀɢᴀɪɴ' }, type: 1 }
-            ]
-        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
+        // User-friendly error message
+        await socket.sendMessage(from, {
+            text: `❌ *Failed to fetch images*\n\n` +
+                  `• Error: ${error.message || 'API connection failed'}\n` +
+                  `• Try again with different keywords\n` +
+                  `• Or try: ${config.PREFIX}img wallpaper`
+        }, { quoted: fakevCard });
     }
     break;
 }
@@ -5349,7 +5407,191 @@ case 'wallpaper': {
     }
     break;
 }
+//case URL 
+case 'tourl':
+case 'upload':
+case 'tourl2': {
+    try {
+        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        const mediaMsg = (quoted && (quoted.imageMessage || quoted.videoMessage || quoted.audioMessage)) ||
+                        msg.message?.imageMessage ||
+                        msg.message?.videoMessage ||
+                        msg.message?.audioMessage;
 
+        if (!mediaMsg) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: `⚠️ Reply to image/video/audio with *${config.PREFIX}tourl*`
+            }, { quoted: fakevCard });
+        }
+
+        const mime = mediaMsg.mimetype || '';
+        if (!/image|video|audio/.test(mime)) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: '⚠️ Only images, videos & audio allowed'
+            }, { quoted: fakevCard });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
+
+        // Download media
+        const stream = await downloadContentFromMessage(mediaMsg, mime.split('/')[0]);
+        let buffer = Buffer.from([]);
+        for await (const chunk of stream) {
+            buffer = Buffer.concat([buffer, chunk]);
+        }
+
+        // Create temp file
+        const ext = mime.split('/')[1] || 'bin';
+        const tempDir = path.join(__dirname, '../temp');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+        
+        const tempFile = path.join(tempDir, `catbox_${Date.now()}.${ext}`);
+        fs.writeFileSync(tempFile, buffer);
+
+        // Upload to Catbox
+        const form = new FormData();
+        form.append('reqtype', 'fileupload');
+        form.append('fileToUpload', fs.createReadStream(tempFile));
+
+        const response = await axios.post('https://catbox.moe/user/api.php', form, { 
+            headers: form.getHeaders(),
+            timeout: 30000 
+        });
+        
+        const url = response.data?.trim();
+        fs.unlinkSync(tempFile);
+
+        if (!url || !url.startsWith('https')) {
+            throw new Error("Upload failed");
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+        // Send success message with ONE button
+        await socket.sendMessage(from, {
+            text: `✅ *Upload Successful!*\n🔗 ${url}`,
+            buttons: [
+                {
+                    urlButton: {
+                        displayText: "🔗 Open URL",
+                        url: url
+                    }
+                }
+            ]
+        }, { quoted: fakevCard });
+
+    } catch (error) {
+        console.error('❌ Tourl Error:', error);
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
+        await socket.sendMessage(from, {
+            text: `❌ Upload failed: ${error.message || 'Unknown error'}`
+        }, { quoted: fakevCard });
+    }
+    break;
+}
+///case quran
+case 'quran': {
+    try {
+        const query = args.join(" ");
+        
+        if (!query) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: `☪️ *Example:* ${config.PREFIX}quran 2:255\n\n👉 *Format:* Surah:Ayah (e.g., 2:255 for Ayatul Kursi)`
+            }, { quoted: fakevCard });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📿', key: msg.key } });
+
+        const [surah, ayah] = query.split(":");
+
+        if (!surah || !ayah) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: '❌ *Please use format:* Surah:Ayah\n*Example:* 2:255'
+            }, { quoted: fakevCard });
+        }
+
+        const response = await axios.get(`https://api.alquran.cloud/v1/ayah/${surah}:${ayah}/en.asad`);
+        
+        if (!response.data || !response.data.data) {
+            throw new Error('Invalid response from Quran API');
+        }
+
+        const verse = response.data.data;
+
+        const quranMessage = {
+            text: `🕋 *QURAN VERSE* 🕋\n\n` +
+                  `━━━━━━━━━━━━━━━━\n\n` +
+                  `📖 *Surah:* ${verse.surah.englishName}\n` +
+                  `📝 *Translation:* ${verse.surah.englishNameTranslation}\n` +
+                  `🔢 *Ayah Number:* ${verse.numberInSurah}\n` +
+                  `📍 *Juz:* ${verse.juz}\n\n` +
+                  `✨ *Verse:*\n"${verse.text}"\n\n` +
+                  `🌍 *Translation (Muhammad Asad):*\n${verse.text}\n\n` +
+                  `━━━━━━━━━━━━━━━━\n` +
+                  `> ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ 🎀`,
+            contextInfo: {
+                forwardingScore: 1,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: '120363420261263259@newsletter',
+                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
+                    serverMessageId: -1
+                }
+            }
+        };
+
+        await socket.sendMessage(from, quranMessage, { quoted: fakevCard });
+        
+        // Send buttons for quick access
+        await socket.sendMessage(from, {
+            text: "📖 *Quran Options*",
+            buttons: [
+                {
+                    quickReplyButton: {
+                        displayText: "🔄 Another Verse",
+                        id: `${config.PREFIX}quran`
+                    }
+                },
+                {
+                    quickReplyButton: {
+                        displayText: "📜 Ayatul Kursi",
+                        id: `${config.PREFIX}quran 2:255`
+                    }
+                },
+                {
+                    quickReplyButton: {
+                        displayText: "📋 Main Menu",
+                        id: `${config.PREFIX}menu`
+                    }
+                }
+            ]
+        }, { quoted: fakevCard });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('❌ Quran Command Error:', error);
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
+        await socket.sendMessage(from, {
+            text: `⚠️ *Unable to fetch Quran verse*\n\n` +
+                  `• Please check Surah and Ayah numbers\n` +
+                  `• Make sure format is correct (e.g., 2:255)\n` +
+                  `• Try again with a valid verse\n\n` +
+                  `*Example:* ${config.PREFIX}quran 1:1`
+        }, { quoted: fakevCard });
+    }
+    break;
+}
 //bible case 
 case 'bible': {
     // React to the command first
@@ -7554,92 +7796,6 @@ case 'admins': {
         console.error("Error in admins command:", error);
     }
     break;
-}
-//case vcf
-case 'vcf': {
-  try {
-    // Check if it's a group
-    if (!from.includes('@g.us')) {
-      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-      return socket.sendMessage(from, { 
-        text: '❌ This command only works in groups!'
-      }, { quoted: fakevCard });
-    }
-
-    // Get group metadata
-    const groupMetadata = await socket.groupMetadata(from);
-    const participants = groupMetadata.participants || [];
-    
-    // Validate group size
-    if (participants.length < 2) {
-      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-      return socket.sendMessage(from, { 
-        text: '❌ Group must have at least 2 members' 
-      }, { quoted: fakevCard });
-    }
-    
-    if (participants.length > 1000) {
-      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-      return socket.sendMessage(from, { 
-        text: '❌ Group is too large (max 1000 members)' 
-      }, { quoted: fakevCard });
-    }
-
-    await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
-
-    // Generate VCF content
-    let vcfContent = '';
-    participants.forEach(participant => {
-      const phoneNumber = participant.id.split('@')[0];
-      const displayName = participant.notify || `User_${phoneNumber}`;
-      
-      vcfContent += `BEGIN:VCARD\n` +
-                    `VERSION:3.0\n` +
-                    `FN:${displayName}\n` +
-                    `TEL;TYPE=CELL:+${phoneNumber}\n` +
-                    `NOTE:From ${groupMetadata.subject}\n` +
-                    `END:VCARD\n\n`;
-    });
-
-    // Create temp file
-    const sanitizedGroupName = groupMetadata.subject.replace(/[^\w]/g, '_');
-    const tempDir = path.join(__dirname, '../temp');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-    
-    const vcfPath = path.join(tempDir, `${sanitizedGroupName}_${Date.now()}.vcf`);
-    fs.writeFileSync(vcfPath, vcfContent);
-
-    // Send VCF file
-    await socket.sendMessage(from, {
-      document: fs.readFileSync(vcfPath),
-      mimetype: 'text/vcard',
-      fileName: `${sanitizedGroupName}_contacts.vcf`,
-      caption: `📇 *Group Contacts*\n\n` +
-               `• Group: ${groupMetadata.subject}\n` +
-               `• Members: ${participants.length}\n` +
-               `• Generated: ${new Date().toLocaleString()}\n\n` +
-               `📁 *File contains ${participants.length} contacts*`
-    }, { quoted: fakevCard });
-
-    // Cleanup
-    setTimeout(() => {
-      if (fs.existsSync(vcfPath)) {
-        fs.unlinkSync(vcfPath);
-      }
-    }, 5000);
-
-    await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-
-  } catch (error) {
-    console.error('❌ VCF Error:', error);
-    await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-    await socket.sendMessage(from, { 
-      text: '❌ Failed to generate VCF file. Please try again later.' 
-    }, { quoted: fakevCard });
-  }
-  break;
 }
 // Helper case for members list
 case 'members': {
