@@ -656,6 +656,101 @@ case 'alive': {
     }
     break;
 }
+///case URL 
+case 'tourl':
+case 'upload':
+case 'catbox': {
+    try {
+        // Dependencies
+        const fs = require('fs');
+        const path = require('path');
+        const { tmpdir } = require('os');
+        const axios = require('axios');
+        const FormData = require('form-data');
+        const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+
+        // Get quoted media
+        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        const mediaMsg = (quotedMsg && (quotedMsg.imageMessage || quotedMsg.videoMessage || quotedMsg.audioMessage)) ||
+                        msg.message?.imageMessage ||
+                        msg.message?.videoMessage ||
+                        msg.message?.audioMessage;
+
+        if (!mediaMsg) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: `⚠️ Reply to an image/video/audio with *${config.PREFIX}tourl*`
+            }, { quoted: fakevCard });
+        }
+
+        const mime = mediaMsg.mimetype || '';
+        if (!/image|video|audio/.test(mime)) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: '⚠️ Only images, videos & audio files are supported'
+            }, { quoted: fakevCard });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
+        await socket.sendMessage(from, {
+            text: '📤 Uploading media to Catbox...'
+        }, { quoted: fakevCard });
+
+        // Download media
+        const stream = await downloadContentFromMessage(mediaMsg, mime.split('/')[0]);
+        let buffer = Buffer.from([]);
+        for await (const chunk of stream) {
+            buffer = Buffer.concat([buffer, chunk]);
+        }
+
+        // Create temp file
+        const ext = mime.split('/')[1] || 'bin';
+        const tmpFile = path.join(tmpdir(), `catbox_${Date.now()}.${ext}`);
+        fs.writeFileSync(tmpFile, buffer);
+
+        // Upload to Catbox
+        const form = new FormData();
+        form.append('reqtype', 'fileupload');
+        form.append('fileToUpload', fs.createReadStream(tmpFile));
+
+        const response = await axios.post('https://catbox.moe/user/api.php', form, { 
+            headers: form.getHeaders(),
+            timeout: 30000 
+        });
+        
+        const url = response.data?.trim();
+        fs.unlinkSync(tmpFile);
+
+        if (!url || !url.startsWith('https')) {
+            throw new Error("Upload failed");
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+        // Send success with URL and button
+        await socket.sendMessage(from, {
+            text: `✅ *Upload Successful!*\n\n🔗 ${url}`,
+            buttons: [
+                {
+                    urlButton: {
+                        displayText: "🔗 Open URL",
+                        url: url
+                    }
+                }
+            ]
+        }, { quoted: fakevCard });
+
+    } catch (error) {
+        console.error('❌ Tourl Error:', error);
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
+        await socket.sendMessage(from, {
+            text: `❌ Upload failed: ${error.message || 'Unknown error'}`
+        }, { quoted: fakevCard });
+    }
+    break;
+}
 //case location 
 case 'location':
 case 'loc':
@@ -2804,7 +2899,7 @@ case 'song': {
     }
     break;
 }
-
+//=====[PLAY COMMAND]================//
 case 'play':
 case 'music':
 case 'ytmp3': {
@@ -7981,7 +8076,58 @@ case 'close': {
     }
     break;
 }
+// case hide tag
+case 'hidetag':
+case 'ht':
+case 'tagall':
+case 'mentionall': {
+    try {
+        // Check if it's a group
+        if (!from.includes('@g.us')) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: '❌ This command only works in groups!'
+            }, { quoted: fakevCard });
+        }
 
+        await socket.sendMessage(sender, { react: { text: '🔔', key: msg.key } });
+
+        // Get message text or use default
+        let messageText = args.length > 0 ? args.join(" ") : "📢 Attention everyone!";
+        
+        // Get all group participants
+        const groupMetadata = await socket.groupMetadata(from);
+        const participants = groupMetadata.participants || [];
+        const mentionJids = participants.map(p => p.id);
+
+        // Send message with mentions
+        await socket.sendMessage(from, {
+            text: `📢 *Group Announcement*\n\n${messageText}\n\n━━━━━━━━━━━━━━━━\n> ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ 🎀`,
+            mentions: mentionJids,
+            contextInfo: {
+                forwardingScore: 1,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: '120363420261263259@newsletter',
+                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
+                    serverMessageId: -1
+                }
+            }
+        }, { quoted: fakevCard });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('❌ Hidetag Error:', error);
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
+        await socket.sendMessage(from, {
+            text: `❌ Failed to send announcement: ${error.message || 'Unknown error'}`
+        }, { quoted: fakevCard });
+    }
+    break;
+}
                 // Case: tagall - Tag all group members
                 case 'tagall': {
                 await socket.sendMessage(sender, { react: { text: '🫂', key: msg.key } });
