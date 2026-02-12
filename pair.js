@@ -656,6 +656,125 @@ case 'alive': {
     }
     break;
 }
+//case location 
+case 'location':
+case 'loc':
+case 'pinlocation':
+case 'getlocation':
+case 'map': {
+    try {
+        await socket.sendMessage(sender, { react: { text: '📍', key: msg.key } });
+
+        const locationQuery = args.join(" ").trim();
+
+        if (!locationQuery) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: `📍 *Location Finder*\n\n` +
+                      `❌ *Please provide a location name!*\n\n` +
+                      `📌 *Usage:*\n` +
+                      `${config.PREFIX}location Nairobi, Kenya\n` +
+                      `${config.PREFIX}loc New York\n` +
+                      `${config.PREFIX}map Paris, France\n\n` +
+                      `*Example:*\n` +
+                      `${config.PREFIX}location Eiffel Tower, Paris`
+            }, { quoted: fakevCard });
+        }
+
+        if (locationQuery.length > 100) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: `📍 *Location Finder*\n\n❌ Location name too long! Max 100 characters.`
+            }, { quoted: fakevCard });
+        }
+
+        await socket.sendMessage(from, {
+            text: `📍 *Searching location:*\n${locationQuery}\n⏳ Please wait...`
+        }, { quoted: fakevCard });
+
+        // Call API to resolve coordinates
+        const apiUrl = `https://apiskeith.vercel.app/tools/location?q=${encodeURIComponent(locationQuery)}`;
+        const response = await axios.get(apiUrl, { timeout: 30000 });
+        const apiData = response.data;
+
+        if (!apiData?.status || !apiData?.result?.results?.length) {
+            throw new Error(`Location not found: ${locationQuery}`);
+        }
+
+        const locationData = apiData.result.results[0];
+        const { lat, lng } = locationData.geometry;
+        const formattedName = locationData.formatted || locationQuery;
+        const fullAddress = locationData.formatted || 
+                           locationData.address || 
+                           `${locationData.name}, ${locationData.country || ''}`.trim();
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+        // Send the location message
+        await socket.sendMessage(from, {
+            location: {
+                degreesLatitude: lat,
+                degreesLongitude: lng,
+                name: formattedName,
+                address: fullAddress
+            },
+            caption: `📍 *${formattedName}*\n\n` +
+                    `━━━━━━━━━━━━━━━━\n\n` +
+                    `🌍 *Coordinates:*\n` +
+                    `Latitude: ${lat}\n` +
+                    `Longitude: ${lng}\n\n` +
+                    `📌 *Address:*\n${fullAddress}\n\n` +
+                    `━━━━━━━━━━━━━━━━\n` +
+                    `> ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ 🎀`,
+            contextInfo: {
+                forwardingScore: 1,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: '120363420261263259@newsletter',
+                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
+                    serverMessageId: -1
+                }
+            }
+        }, { quoted: fakevCard });
+
+        // Send button for directions
+        await socket.sendMessage(from, {
+            text: " ",
+            buttons: [
+                {
+                    urlButton: {
+                        displayText: "🗺️ Open in Google Maps",
+                        url: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+                    }
+                }
+            ]
+        }, { quoted: fakevCard });
+
+        await socket.sendMessage(sender, { react: { text: '📍', key: msg.key } });
+
+    } catch (error) {
+        console.error('❌ Location Command Error:', error);
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
+        let errorMessage = `📍 *Location Not Found*\n\n❌ Could not find location: "${args.join(' ') || 'Unknown'}"`;
+        
+        if (error.response?.status === 404) {
+            errorMessage = `📍 *Location Error*\n\n❌ Location service endpoint not found!`;
+        } else if (error.message.includes('timeout')) {
+            errorMessage = `📍 *Location Error*\n\n❌ Location search timed out! Try again.`;
+        } else if (error.response?.status === 429) {
+            errorMessage = `📍 *Location Error*\n\n❌ Too many requests! Please wait.`;
+        } else if (error.message.includes('Location not found')) {
+            errorMessage = `📍 *Location Not Found*\n\n❌ ${error.message}`;
+        }
+
+        await socket.sendMessage(from, {
+            text: errorMessage
+        }, { quoted: fakevCard });
+    }
+    break;
+}
 ///xoding case 
 case 'color': {
     // React to the command
@@ -966,12 +1085,12 @@ case 'menu': {
       buttons: [
         {
           buttonId: `${config.PREFIX}quick_commands`,
-          buttonText: { displayText: '🤖 𝑺𝑬𝑳𝑬𝑪𝑻 𝑨 𝑪𝑨𝑻𝑬𝑮𝑶𝑹𝒀' },
+          buttonText: { displayText: '🤖 sᴇʟᴇᴄᴛ ᴄᴀᴛᴇɢᴏʀʏ' },
           type: 4,
           nativeFlowInfo: {
             name: 'single_select',
             paramsJson: JSON.stringify({
-              title: '🤖 𝑺𝑬𝑳𝑬𝑪𝑻 𝑨 𝑪𝑨𝑻𝑬𝑮𝑶𝑹𝒀',
+              title: '🤖 sᴇʟᴇᴄᴛ ᴄᴀᴛᴇɢᴏʀʏ',
               sections: [
                 {
                   title: "🌐 ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs",
@@ -2587,7 +2706,7 @@ case 'lyrics': {
     break;
 }
 //=====[PLAY COMMAND]================//
-case 'play': {
+case 'song': {
     try {
         // React to the command first
         await socket.sendMessage(sender, {
@@ -2685,174 +2804,8 @@ case 'play': {
     }
     break;
 }
-  //=====[Song COMMAND]================//
-//=====[Song COMMAND]================//
-case 'song': {
-  const { ytsearch } = require('@dark-yasiya/yt-dl.js');
-  const RPL = `💭😒 *Please provide a song name or YouTube link to search.*\n\n👨‍🔧 *Example:* \`.song Shape of You\``;
 
-  // Check if user gave arguments
-  if (!args[0]) {
-    return await socket.sendMessage(from, {
-      text: RPL
-    }, { quoted: msg });
-  }
-
-  const q = args.join(" ");
-
-  try {
-    const yt = await ytsearch(q);
-
-    if (!yt || !yt.results || yt.results.length === 0) {
-      return reply("❌ *No results found. Try a different song title or link.*");
-    }
-
-    const song = yt.results[0];
-    const url = song.url;
-    const thumb = song.thumbnail;
-
-    const caption = `ᴍɪɴɪ ʙᴏᴛ ꜱᴏɴɢ ᴅᴏᴡɴʟᴏᴀᴅ 🎶
-
-*📋 тιттℓє ➟* ${song.title}
-*🏮 ∂υяαтιση ➟* ${song.timestamp}
-*👤 ¢яєαтσя ➟* ${song.author?.name || 'Unknown'}
-*📎 ѕσηg υяℓ ➟* ${url}
-
-> Caseyrhodes Tech - 🔥`;
-
-    const templateButtons = [
-      {
-        buttonId: `${config.PREFIX}mp3play ${url}`,
-        buttonText: { displayText: 'ꜱᴏɴɢ ᴍᴘ3 🎶' },
-        type: 1,
-      },
-      {
-        buttonId: `${config.PREFIX}mp3doc ${url}`,
-        buttonText: { displayText: 'ꜱᴏɴɢ ᴅᴏᴄᴜᴍᴇɴᴛ 📂' },
-        type: 1,
-      },
-      {
-        buttonId: `${config.PREFIX}mp3ptt ${url}`,
-        buttonText: { displayText: 'ꜱᴏɴɢ ᴠᴏɪᴄᴇ ᴛᴘᴘ 🎤' },
-        type: 1
-      }
-    ];
-
-    await socket.sendMessage(from, {
-      image: { url: thumb },
-      caption: caption.trim(),
-      footer: 'Caseyrhodes mini⚡',
-      buttons: templateButtons,
-      headerType: 1
-    }, { quoted: msg });
-
-  } catch (e) {
-    console.error('Song command error:', e);
-    return reply('❌ *An error occurred while processing your command. Please try again.*\n\n> *caseyrhodes mini 💚🔥*');
-  }
-
-  break;
-}
-
-case 'mp3play': {
-  const axios = require("axios");
-  
-  // Fix: Get URL from message body properly
-  const url = msg.body?.split(" ")[1] || args[0];
-  if (!url || !url.startsWith('http')) {
-    return await socket.sendMessage(from, { text: "*❌ Invalid or missing YouTube URL*" }, { quoted: msg });
-  }
-
-  try {
-    // Show processing message
-    await socket.sendMessage(from, { text: "*📥 Downloading MP3... Please wait*" }, { quoted: msg });
-    
-    const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(url)}`;
-    const { data } = await axios.get(apiUrl, { timeout: 30000 });
-
-    if (!data || !data.url) {
-      return await socket.sendMessage(from, { text: "*❌ Failed to fetch MP3 download link*" }, { quoted: msg });
-    }
-
-    await socket.sendMessage(from, {
-      audio: { url: data.url },
-      mimetype: "audio/mpeg",
-      fileName: `song_${Date.now()}.mp3`
-    }, { quoted: msg });
-
-  } catch (err) {
-    console.error('MP3 Play error:', err);
-    await socket.sendMessage(from, { text: "*❌ Error occurred while downloading MP3. Please try again.*" }, { quoted: msg });
-  }
-
-  break;
-}
-
-case 'mp3doc': {
-  const axios = require("axios");
-  
-  const url = msg.body?.split(" ")[1] || args[0];
-  if (!url || !url.startsWith('http')) {
-    return await socket.sendMessage(from, { text: "*❌ Invalid or missing YouTube URL*" }, { quoted: msg });
-  }
-
-  try {
-    await socket.sendMessage(from, { text: "*📥 Downloading as document... Please wait*" }, { quoted: msg });
-    
-    const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(url)}`;
-    const { data } = await axios.get(apiUrl, { timeout: 30000 });
-
-    if (!data || !data.url) {
-      return await socket.sendMessage(from, { text: "*❌ Failed to fetch MP3 download link*" }, { quoted: msg });
-    }
-
-    await socket.sendMessage(from, {
-      document: { url: data.url },
-      mimetype: "audio/mpeg",
-      fileName: `mini_bot_song_${Date.now()}.mp3`
-    }, { quoted: msg });
-
-  } catch (err) {
-    console.error('MP3 Doc error:', err);
-    await socket.sendMessage(from, { text: "*❌ Error occurred while downloading as document*" }, { quoted: msg });
-  }
-
-  break;
-}
-
-case 'mp3ptt': {
-  const axios = require("axios");
-  
-  const url = msg.body?.split(" ")[1] || args[0];
-  if (!url || !url.startsWith('http')) {
-    return await socket.sendMessage(from, { text: "*❌ Invalid or missing YouTube URL*" }, { quoted: msg });
-  }
-
-  try {
-    await socket.sendMessage(from, { text: "*📥 Preparing voice note... Please wait*" }, { quoted: msg });
-    
-    const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(url)}`;
-    const { data } = await axios.get(apiUrl, { timeout: 30000 });
-
-    if (!data || !data.url) {
-      return await socket.sendMessage(from, { text: "*❌ Failed to fetch MP3 download link*" }, { quoted: msg });
-    }
-
-    await socket.sendMessage(from, {
-      audio: { url: data.url },
-      mimetype: "audio/mpeg",
-      ptt: true, // voice note
-      fileName: `voice_note_${Date.now()}.mp3`
-    }, { quoted: msg });
-
-  } catch (err) {
-    console.error('MP3 PTT error:', err);
-    await socket.sendMessage(from, { text: "*❌ Error occurred while sending as voice note*" }, { quoted: msg });
-  }
-
-  break;
-}
-case 'play2':
+case 'play':
 case 'music':
 case 'ytmp3': {
     try {
