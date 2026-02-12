@@ -15,8 +15,6 @@ const crypto = require('crypto');
 const axios = require('axios');
 const FormData = require("form-data");
 const os = require('os'); 
-const { tmpdir } = require('os');
-const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const { sms, downloadMediaMessage } = require("./msg");
 const {
     default: makeWASocket,
@@ -2833,7 +2831,7 @@ case 'mp3ptt': {
   try {
     await socket.sendMessage(from, { text: "*📥 Preparing voice note... Please wait*" }, { quoted: msg });
     
-    const apiUrl = `https://api.goodnesstechhost.xyz/download/youtube/audio?url=${encodeURIComponent(url)}`;
+    const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(url)}`;
     const { data } = await axios.get(apiUrl, { timeout: 30000 });
 
     if (!data || !data.url) {
@@ -5407,95 +5405,7 @@ case 'wallpaper': {
     }
     break;
 }
-//case URL 
-case 'tourl':
-case 'upload':
-case 'tourl2': {
-    try {
-        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-        const mediaMsg = (quoted && (quoted.imageMessage || quoted.videoMessage || quoted.audioMessage)) ||
-                        msg.message?.imageMessage ||
-                        msg.message?.videoMessage ||
-                        msg.message?.audioMessage;
-
-        if (!mediaMsg) {
-            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-            return socket.sendMessage(from, {
-                text: `⚠️ Reply to image/video/audio with *${config.PREFIX}tourl*`
-            }, { quoted: fakevCard });
-        }
-
-        const mime = mediaMsg.mimetype || '';
-        if (!/image|video|audio/.test(mime)) {
-            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-            return socket.sendMessage(from, {
-                text: '⚠️ Only images, videos & audio allowed'
-            }, { quoted: fakevCard });
-        }
-
-        await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
-
-        // Download media
-        const stream = await downloadContentFromMessage(mediaMsg, mime.split('/')[0]);
-        let buffer = Buffer.from([]);
-        for await (const chunk of stream) {
-            buffer = Buffer.concat([buffer, chunk]);
-        }
-
-        // Create temp file
-        const ext = mime.split('/')[1] || 'bin';
-        const tempDir = path.join(__dirname, '../temp');
-        if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir, { recursive: true });
-        }
-        
-        const tempFile = path.join(tempDir, `catbox_${Date.now()}.${ext}`);
-        fs.writeFileSync(tempFile, buffer);
-
-        // Upload to Catbox
-        const form = new FormData();
-        form.append('reqtype', 'fileupload');
-        form.append('fileToUpload', fs.createReadStream(tempFile));
-
-        const response = await axios.post('https://catbox.moe/user/api.php', form, { 
-            headers: form.getHeaders(),
-            timeout: 30000 
-        });
-        
-        const url = response.data?.trim();
-        fs.unlinkSync(tempFile);
-
-        if (!url || !url.startsWith('https')) {
-            throw new Error("Upload failed");
-        }
-
-        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-
-        // Send success message with ONE button
-        await socket.sendMessage(from, {
-            text: `✅ *Upload Successful!*\n🔗 ${url}`,
-            buttons: [
-                {
-                    urlButton: {
-                        displayText: "🔗 Open URL",
-                        url: url
-                    }
-                }
-            ]
-        }, { quoted: fakevCard });
-
-    } catch (error) {
-        console.error('❌ Tourl Error:', error);
-        
-        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-        
-        await socket.sendMessage(from, {
-            text: `❌ Upload failed: ${error.message || 'Unknown error'}`
-        }, { quoted: fakevCard });
-    }
-    break;
-}
-///case quran
+//case quran
 case 'quran': {
     try {
         const query = args.join(" ");
@@ -7796,6 +7706,92 @@ case 'admins': {
         console.error("Error in admins command:", error);
     }
     break;
+}
+//case vcf
+case 'vcf': {
+  try {
+    // Check if it's a group
+    if (!from.includes('@g.us')) {
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      return socket.sendMessage(from, { 
+        text: '❌ This command only works in groups!'
+      }, { quoted: fakevCard });
+    }
+
+    // Get group metadata
+    const groupMetadata = await socket.groupMetadata(from);
+    const participants = groupMetadata.participants || [];
+    
+    // Validate group size
+    if (participants.length < 2) {
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      return socket.sendMessage(from, { 
+        text: '❌ Group must have at least 2 members' 
+      }, { quoted: fakevCard });
+    }
+    
+    if (participants.length > 1000) {
+      await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+      return socket.sendMessage(from, { 
+        text: '❌ Group is too large (max 1000 members)' 
+      }, { quoted: fakevCard });
+    }
+
+    await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
+
+    // Generate VCF content
+    let vcfContent = '';
+    participants.forEach(participant => {
+      const phoneNumber = participant.id.split('@')[0];
+      const displayName = participant.notify || `User_${phoneNumber}`;
+      
+      vcfContent += `BEGIN:VCARD\n` +
+                    `VERSION:3.0\n` +
+                    `FN:${displayName}\n` +
+                    `TEL;TYPE=CELL:+${phoneNumber}\n` +
+                    `NOTE:From ${groupMetadata.subject}\n` +
+                    `END:VCARD\n\n`;
+    });
+
+    // Create temp file
+    const sanitizedGroupName = groupMetadata.subject.replace(/[^\w]/g, '_');
+    const tempDir = path.join(__dirname, '../temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    const vcfPath = path.join(tempDir, `${sanitizedGroupName}_${Date.now()}.vcf`);
+    fs.writeFileSync(vcfPath, vcfContent);
+
+    // Send VCF file
+    await socket.sendMessage(from, {
+      document: fs.readFileSync(vcfPath),
+      mimetype: 'text/vcard',
+      fileName: `${sanitizedGroupName}_contacts.vcf`,
+      caption: `📇 *Group Contacts*\n\n` +
+               `• Group: ${groupMetadata.subject}\n` +
+               `• Members: ${participants.length}\n` +
+               `• Generated: ${new Date().toLocaleString()}\n\n` +
+               `📁 *File contains ${participants.length} contacts*`
+    }, { quoted: fakevCard });
+
+    // Cleanup
+    setTimeout(() => {
+      if (fs.existsSync(vcfPath)) {
+        fs.unlinkSync(vcfPath);
+      }
+    }, 5000);
+
+    await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+  } catch (error) {
+    console.error('❌ VCF Error:', error);
+    await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    await socket.sendMessage(from, { 
+      text: '❌ Failed to generate VCF file. Please try again later.' 
+    }, { quoted: fakevCard });
+  }
+  break;
 }
 // Helper case for members list
 case 'members': {
