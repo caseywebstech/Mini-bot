@@ -46,7 +46,7 @@ const config = {
     NEWSLETTER_MESSAGE_ID: '428',
     OTP_EXPIRY: 300000,
     version: '1.0.0',
-    OWNER_NUMBER: '254101022551',
+    OWNER_NUMBER: '254704472907',
     OWNER_NAME: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs🎀',
     BOT_FOOTER: '> ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs',
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbBuCXcAO7RByB99ce3R'
@@ -1551,6 +1551,8 @@ case 'logomenu': {
 *┃*  🌟 *${config.PREFIX}pp*
 *┃*  🎨 *${config.PREFIX}logo*
 *┃*  📱 *${config.PREFIX}qr*
+*┃*  👻 *${config.PREFIX}storyvideo*
+*┃*  🎊 *${config.PREFIX}twitterdl*
 *╰──────────────⊷*
  ╭─『 🎨 *ᴄᴏᴅɪɴɢ ᴄᴏᴍᴍᴀɴᴅs* 』─╮
 *┃* 🗣️ *base64*
@@ -1606,8 +1608,10 @@ case 'logomenu': {
 *╰──────────────⊷*
 *╭────〘 ᴅᴏᴡɴʟᴏᴀᴅs 〙───⊷*
 *┃*  🎵 *${config.PREFIX}song*
+*┃*  🌸 *${config.PREFIX}twitterdl*
 *┃*  📱 *${config.PREFIX}tiktok*
 *┃*  🎊 *${config.PREFIX}play*
+*┃*  🌼 *${config.PREFIX}music*
 *┃*  📜 *${config.PREFIX}yts*
 *┃*  📘 *${config.PREFIX}fb*
 *┃*  📸 *${config.PREFIX}ig*
@@ -3098,164 +3102,343 @@ case 'grouplist': {
                     }
                     break;
                 }
-//===========text maker====================    
-
-//===============================
-                case 'fancy': {
-                await socket.sendMessage(sender, { react: { text: '🖋', key: msg.key } });
-                    const axios = require("axios");
-                    
-                    const q =
-                        msg.message?.conversation ||
-                        msg.message?.extendedTextMessage?.text ||
-                        msg.message?.imageMessage?.caption ||
-                        msg.message?.videoMessage?.caption || '';
-
-                    const text = q.trim().replace(/^.fancy\s+/i, "");
-
-                    if (!text) {
-                        return await socket.sendMessage(sender, {
-                            text: "❎ *Give me some text to make it fancy, sweetie 😘*\n\n📌 *Example:* `.fancy CASEYRHODES`"
-                        });
-                    }
-
-                    try {
-                        const apiUrl = `https://www.dark-yasiya-api.site/other/font?text=${encodeURIComponent(text)}`;
-                        const response = await axios.get(apiUrl);
-
-                        if (!response.data.status || !response.data.result) {
-                            return await socket.sendMessage(sender, {
-                                text: "❌ *Oh, darling, the fonts got shy! Try again later? 💔*"
-                            });
-                        }
-
-                        const fontList = response.data.result
-                            .map(font => `*${font.name}:*\n${font.result}`)
-                            .join("\n\n");
-
-                        const finalMessage = `🎨 *Fancy Fonts Converter*\n\n${fontList}\n\n_ᴘᴏᴡᴇʀᴇᴅ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ`;
-
-                        await socket.sendMessage(sender, {
-                            text: finalMessage
-                        }, { quoted: fakevCard });
-                    } catch (err) {
-                        console.error("Fancy Font Error:", err);
-                        await socket.sendMessage(sender, {
-                            text: "⚠️ *Something went wrong with the fonts, love 😢 Try again?*"
-                        });
-                    }
-                    break;
-                    }
-case 'tiktok':
-case 'tt':
-case 'tiktokdl': {
+//===========text maker====================   
+ // ──────── 🧠 Eval (Owner Only) ────────
+case 'eval':
+case 'e':
+case '+':
+case '>':
+case 'execute': {
     try {
-        const axios = require('axios');
-        const q = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || msg.message?.videoMessage?.caption || '';
-        const args = q.split(' ').slice(1);
-        const tiktokUrl = args[0];
-        if (!tiktokUrl || !tiktokUrl.includes("tiktok.com")) {
-            return await socket.sendMessage(sender, { text: '❌ *Please provide a valid TikTok URL.*\nExample: .tiktok https://vm.tiktok.com/abc123', buttons: [{ buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }, { buttonId: `${config.PREFIX}help`, buttonText: { displayText: '❓ HELP' }, type: 1 }] }, { quoted: msg });
+        // Check if user is bot owner
+        const ownerNumbers = config.OWNER_NUMBERS || ['254704472907']; // Add your owner numbers
+        const isOwner = ownerNumbers.includes(sender.split('@')[0]);
+        
+        if (!isOwner) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: '❌ *Only the bot owner can use this command!*'
+            }, { quoted: fakevCard });
         }
-        await socket.sendMessage(sender, { react: { text: "⏳", key: msg.key } });
-        let data;
+
+        const codeToEval = args.join(" ");
+        
+        if (!codeToEval) {
+            return socket.sendMessage(from, {
+                text: `🧠 *Eval JavaScript Code*\n\n*Usage:* ${config.PREFIX}eval <code>\n*Example:* ${config.PREFIX}eval 2+2\n*Example:* ${config.PREFIX}eval console.log('hello')\n\n⚠️ *Warning:* This executes code directly!`
+            }, { quoted: fakevCard });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🧠', key: msg.key } });
+
+        // Send thinking message
+        await socket.sendMessage(from, {
+            text: '🧠 *Evaluating code...*'
+        }, { quoted: fakevCard });
+
+        // Prepare context variables for eval
+        const context = {
+            socket,
+            sender,
+            from,
+            msg,
+            args,
+            config,
+            fakevCard,
+            axios: require('axios'),
+            fs: require('fs'),
+            path: require('path'),
+            util: require('util'),
+            _: require('lodash'),
+            moment: require('moment')
+        };
+
+        // Create a safe eval function with context
+        const asyncEval = async (code) => {
+            const asyncFn = new Function(...Object.keys(context), `return (async () => { ${code} })()`);
+            return await asyncFn(...Object.values(context));
+        };
+
+        let result;
+        const startTime = Date.now();
+        
         try {
-            const res = await axios.get(`https://api.giftedtech.co.ke/api/download/tiktokdlv3?apikey=gifted&url=${encodeURIComponent(tiktokUrl)}`, { timeout: 15000 });
-            if (res.data?.status === 200) data = res.data.result;
-        } catch (primaryError) {
-            console.log('Primary API failed, trying fallback...');
-        }
-        if (!data) {
+            // Try async eval first
+            result = await asyncEval(codeToEval);
+        } catch (asyncError) {
             try {
-                const fallback = await axios.get(`https://api.giftedtech.co.ke/api/download/tiktokdlv3?apikey=gifted&url=${encodeURIComponent(tiktokUrl)}`, { timeout: 15000 });
-                if (fallback.data?.data) {
-                    const r = fallback.data.data;
-                    data = { title: r.title, author: { username: r.author.unique_id, nickname: r.author.nickname }, metrics: { digg_count: r.digg_count, comment_count: r.comment_count, share_count: r.share_count, download_count: r.download_count }, url: r.play, thumbnail: r.cover };
-                }
-            } catch (fallbackError) {
-                console.error('Fallback API also failed');
+                // Fallback to sync eval
+                const syncFn = new Function(...Object.keys(context), `return (${codeToEval})`);
+                result = syncFn(...Object.values(context));
+            } catch (syncError) {
+                // Try direct eval as last resort
+                result = eval(codeToEval);
             }
         }
-        if (!data) {
-            return await socket.sendMessage(sender, { text: '❌ *TikTok video not found or API services are down.*\nPlease try again later.', buttons: [{ buttonId: `${config.PREFIX}owner`, buttonText: { displayText: '👑 OWNER' }, type: 1 }, { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }] }, { quoted: msg });
-        }
-        const { title, author, url, metrics, thumbnail } = data;
-        
-        // Send description with thumbnail and buttons FIRST
-        const caption = `🎬 *TikTok Downloader*\n\n╭─❍ ᴄᴀsᴇʏʀʜᴏᴅᴇs-ᴡᴏʀʟᴅ ❍\n┊🎵 *Title:* ${title || 'No title'}\n┊👤 *Author:* @${author.username} (${author.nickname})\n┊❤️ *Likes:* ${metrics.digg_count || 0}\n┊💬 *Comments:* ${metrics.comment_count || 0}\n┊🔁 *Shares:* ${metrics.share_count || 0}\n┊📥 *Downloads:* ${metrics.download_count || 0}\n╰─❍\n> ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs xᴛᴇᴄʂ\n\n⏳ *Downloading video... Please wait*`;
-        
-        await socket.sendMessage(sender, { 
-            image: { url: thumbnail }, 
-            caption: caption, 
-            buttons: [
-                { buttonId: `${config.PREFIX}download_video`, buttonText: { displayText: '📥 DOWNLOAD VIDEO' }, type: 1 }, 
-                { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MAIN MENU' }, type: 1 }, 
-                { buttonId: `${config.PREFIX}fb`, buttonText: { displayText: '📘 FACEBOOK DL' }, type: 1 }
-            ] 
-        }, { quoted: msg });
 
-        // THEN download and send the video
+        const endTime = Date.now();
+        const executionTime = endTime - startTime;
+
+        // Format the result
+        const util = require('util');
+        const resultString = util.inspect(result, { 
+            depth: 2, 
+            maxArrayLength: 50,
+            colors: false,
+            breakLength: Infinity
+        });
+
+        // Truncate if too long
+        const maxLength = 4000;
+        const truncatedResult = resultString.length > maxLength 
+            ? resultString.substring(0, maxLength) + '...\n[Output truncated]' 
+            : resultString;
+
+        // Send result
+        await socket.sendMessage(from, {
+            text: `🧠 *EVAL RESULT* 🧠\n\n` +
+                  `━━━━━━━━━━━━━━━━\n\n` +
+                  `📥 *Input:*\n\`\`\`js\n${codeToEval.length > 100 ? codeToEval.substring(0, 100) + '...' : codeToEval}\n\`\`\`\n\n` +
+                  `📤 *Output:*\n\`\`\`js\n${truncatedResult}\n\`\`\`\n\n` +
+                  `⚡ *Execution Time:* ${executionTime}ms\n` +
+                  `📦 *Result Type:* ${typeof result}\n\n` +
+                  `━━━━━━━━━━━━━━━━\n` +
+                  `> ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ 🎀`,
+            contextInfo: {
+                forwardingScore: 1,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: '120363420261263259@newsletter',
+                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
+                    serverMessageId: -1
+                }
+            }
+        }, { quoted: fakevCard });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('❌ Eval Error:', error);
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
+        // Send error message
+        await socket.sendMessage(from, {
+            text: `❌ *EVAL ERROR* ❌\n\n` +
+                  `━━━━━━━━━━━━━━━━\n\n` +
+                  `📥 *Input:*\n\`\`\`js\n${args.join(' ') || 'No input'}\n\`\`\`\n\n` +
+                  `🚫 *Error:*\n\`\`\`js\n${error.message}\n\`\`\`\n\n` +
+                  `━━━━━━━━━━━━━━━━\n` +
+                  `> ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ 🎀`
+        }, { quoted: fakevCard });
+    }
+    break;
+}
+case 'storyvideo':
+case 'upswvideo': {
+    try {
+        // Check if owner (replace with your number)
+        if (sender.split('@')[0] !== '254704472907') {
+            return socket.sendMessage(from, {
+                text: '❌ Only bot owner can use this!'
+            }, { quoted: fakevCard });
+        }
+
+        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        
+        if (!quoted?.videoMessage) {
+            return socket.sendMessage(from, {
+                text: '⚠️ Reply to a video!'
+            }, { quoted: fakevCard });
+        }
+
+        // Download and upload
+        const stream = await downloadContentFromMessage(quoted.videoMessage, 'video');
+        let buffer = Buffer.from([]);
+        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+        await socket.sendMessage('status@broadcast', {
+            video: buffer,
+            caption: args.join(" ") || '📱 CaseyRhodes Bot Status'
+        });
+
+        socket.sendMessage(from, {
+            text: '✅ Video uploaded to status!'
+        }, { quoted: fakevCard });
+
+    } catch (error) {
+        socket.sendMessage(from, {
+            text: '❌ Upload failed'
+        }, { quoted: fakevCard });
+    }
+    break;
+}
+case 'cal':
+case 'calc': {
+    try {
+        const expr = args.join(" ");
+        
+        if (!expr) {
+            return socket.sendMessage(from, {
+                text: `🧮 *Usage:* ${config.PREFIX}math <expression>\n*Example:* ${config.PREFIX}math 5*6+2`
+            }, { quoted: fakevCard });
+        }
+
+        // Basic safety check
+        if (expr.includes('require') || expr.includes('process')) {
+            throw new Error('Invalid expression');
+        }
+
+        const result = eval(expr);
+        
+        await socket.sendMessage(from, {
+            text: `🧮 *${expr} = ${result}*`
+        }, { quoted: fakevCard });
+
+    } catch {
+        socket.sendMessage(from, {
+            text: '❌ Invalid math expression!'
+        }, { quoted: fakevCard });
+    }
+    break;
+}
+//===============================
+case 'fancy':
+case 'fancytext':
+case 'styletext':
+case 'textstyle':
+case 'fancyfont': {
+    try {
+        const query = args.join(" ");
+        
+        if (!query) {
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            return socket.sendMessage(from, {
+                text: `✨ *Fancy Text Generator*\n\n*Usage:* ${config.PREFIX}fancy <text>\n*Example:* ${config.PREFIX}fancy orman xmd\n*Example:* ${config.PREFIX}styletext hello world\n\n📌 *Converts normal text to various fancy styles*`
+            }, { quoted: fakevCard });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✨', key: msg.key } });
+
+        // Call fancy text API
+        const response = await axios.get(`https://api.textfancy.xyz/style?text=${encodeURIComponent(query)}`, {
+            timeout: 10000
+        });
+
+        if (!response.data?.result || !Array.isArray(response.data.result) || response.data.result.length === 0) {
+            throw new Error('No fancy styles received');
+        }
+
+        // Get fancy text styles
+        const styles = response.data.result;
+        
+        // Limit to 15 styles to avoid message too long
+        const displayStyles = styles.slice(0, 15);
+        
+        // Format the fancy text styles
+        let fancyText = `✨ *FANCY TEXT STYLES* ✨\n\n`;
+        fancyText += `━━━━━━━━━━━━━━━━\n\n`;
+        fancyText += `📝 *Original Text:*\n${query}\n\n`;
+        fancyText += `🎨 *Fancy Styles:*\n\n`;
+        
+        displayStyles.forEach((style, index) => {
+            fancyText += `${index + 1}. ${style}\n`;
+        });
+        
+        if (styles.length > 15) {
+            fancyText += `\n*...and ${styles.length - 15} more styles*\n`;
+        }
+        
+        fancyText += `\n━━━━━━━━━━━━━━━━\n`;
+        fancyText += `> ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ 🎀`;
+
+        // Send fancy text styles
+        await socket.sendMessage(from, {
+            text: fancyText,
+            contextInfo: {
+                forwardingScore: 1,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: '120363420261263259@newsletter',
+                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
+                    serverMessageId: -1
+                }
+            }
+        }, { quoted: fakevCard });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('❌ Fancy Text Error:', error);
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
+        // Fallback with sample fancy text if API fails
         try {
-            const videoResponse = await axios.get(url, { 
-                responseType: 'arraybuffer', 
-                timeout: 30000, 
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' } 
-            });
-            const videoBuffer = Buffer.from(videoResponse.data, 'binary');
+            const query = args.join(" ");
+            const sampleFancy = `✨ *FANCY TEXT STYLES* ✨\n\n` +
+                `━━━━━━━━━━━━━━━━\n\n` +
+                `📝 *Original Text:*\n${query}\n\n` +
+                `🎨 *Fancy Styles:*\n\n` +
+                `1. ${query}\n` +
+                `2. 𝓕𝓪𝓷𝓬𝔂 ${query}\n` +
+                `3. 𝐅𝐚𝐧𝐜𝐲 ${query}\n` +
+                `4. 𝘍𝘢𝘯𝘤𝘺 ${query}\n` +
+                `5. 𝙵𝚊𝚗𝚌𝚢 ${query}\n` +
+                `6. 🄵🄰🄽🄲🅈 ${query}\n` +
+                `7. Ⓕⓐⓝⓒⓨ ${query}\n` +
+                `8. 𝔽𝕒𝕟𝕔𝕪 ${query}\n` +
+                `9. ᖴᗩᑎᑕᎩ ${query}\n` +
+                `10. 𝗙𝗮𝗻𝗰𝘆 ${query}\n\n` +
+                `━━━━━━━━━━━━━━━━\n` +
+                `> ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ 🎀`;
+                
+            await socket.sendMessage(from, {
+                text: sampleFancy
+            }, { quoted: fakevCard });
             
-            // Send video separately after description
-            await socket.sendMessage(sender, { 
-                video: videoBuffer, 
-                caption: `🎥 *Video by* @${author.username}\n\n> ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs xᴛᴇᴄʜ`, 
-                buttons: [
-                    { buttonId: `${config.PREFIX}play`, buttonText: { displayText: '🎵 DOWNLOAD AUDIO' }, type: 1 }, 
-                    { buttonId: `${config.PREFIX}tiktok ${tiktokUrl}`, buttonText: { displayText: '🔄 DOWNLOAD AGAIN' }, type: 1 }, 
-                    { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MAIN MENU' }, type: 1 }
-                ], 
-                contextInfo: { 
-                    mentionedJid: [msg.key.participant || msg.key.remoteJid], 
-                    externalAdReply: { 
-                        title: 'TikTok Download', 
-                        body: `By @${author.username}`, 
-                        mediaType: 2, 
-                        sourceUrl: tiktokUrl, 
-                        thumbnailUrl: thumbnail 
-                    } 
-                } 
-            });
-
-            // Send success confirmation
-            await socket.sendMessage(sender, { 
-                text: '✅ *Video downloaded successfully!*\n\nCheck above for your video! 🎬', 
-                buttons: [
-                    { buttonId: `${config.PREFIX}ig`, buttonText: { displayText: '📸 INSTAGRAM DL' }, type: 1 }, 
-                    { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MAIN MENU' }, type: 1 }
-                ] 
-            }, { quoted: msg });
+            await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
             
-            await socket.sendMessage(sender, { react: { text: "✅", key: msg.key } });
-            
-        } catch (downloadError) {
-            console.error('Video download failed:', downloadError);
-            await socket.sendMessage(sender, { 
-                text: '❌ *Failed to download video.* The video might be too large or restricted.\n\n*Video info is still available above!*', 
-                buttons: [
-                    { buttonId: `${config.PREFIX}owner`, buttonText: { displayText: '👑 REPORT ISSUE' }, type: 1 }, 
-                    { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MAIN MENU' }, type: 1 }
-                ] 
-            }, { quoted: msg });
+        } catch (fallbackError) {
+            await socket.sendMessage(from, {
+                text: `❌ *Failed to generate fancy text*\n\nError: ${error.message || 'API error'}\n\nTry again later.`
+            }, { quoted: fakevCard });
         }
-    } catch (err) {
-        console.error("TikTok download error:", err);
-        await socket.sendMessage(sender, { react: { text: "❌", key: msg.key } });
-        await socket.sendMessage(sender, { 
-            text: '❌ *Failed to process TikTok video.*\nPlease check the URL and try again.', 
-            buttons: [
-                { buttonId: `${config.PREFIX}owner`, buttonText: { displayText: '👑 GET HELP' }, type: 1 }, 
-                { buttonId: `${config.PREFIX}menu`, buttonText: { displayText: '📋 MAIN MENU' }, type: 1 }, 
-                { buttonId: `${config.PREFIX}help`, buttonText: { displayText: '❓ HOW TO USE' }, type: 1 }
-            ] 
-        }, { quoted: msg });
+    }
+    break;
+}
+///case tiktok
+case 'tiktok':
+case 'tt': {
+    const url = args[0];
+    
+    if (!url) {
+        return socket.sendMessage(from, {
+            text: '*Please provide a TikTok video url!*'
+        }, { quoted: fakevCard });
+    }
+    
+    try {
+        const apiUrl = await fetchJson(`https://api-aswin-sparky.koyeb.app/api/downloader/tiktok?url=${url}`);
+        
+        await socket.sendMessage(from, {
+            video: { url: apiUrl.data.video },
+            caption: '> *_ᴅᴏᴡɴʟᴏᴀᴅᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ_* 🎀',
+            contextInfo: {
+                forwardingScore: 1,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: '120363420261263259@newsletter',
+                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
+                    serverMessageId: -1
+                }
+            }
+        }, { quoted: fakevCard });
+        
+    } catch (error) {
+        socket.sendMessage(from, {
+            text: 'Error occurred'
+        }, { quoted: fakevCard });
     }
     break;
 }
