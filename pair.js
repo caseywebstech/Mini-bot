@@ -1957,50 +1957,6 @@ case 'ping': {
     }
     break;
 }
-
-case 'autorecording':
-case 'autorecord': {
-    // Check if owner
-    const ownerNumbers = config.OWNER_NUMBERS || ['254704472907'];
-    const isOwner = ownerNumbers.includes(sender.split('@')[0]);
-    
-    if (!isOwner) {
-        return socket.sendMessage(from, {
-            text: '❌ Only the bot owner can use this command!'
-        }, { quoted: fakevCard });
-    }
-
-    const mode = args[0]?.toLowerCase();
-    
-    if (!mode || !['on', 'off'].includes(mode)) {
-        return socket.sendMessage(from, {
-            text: `❌ Usage: ${config.PREFIX}autorecording <on/off>\nExample: ${config.PREFIX}autorecording on`
-        }, { quoted: fakevCard });
-    }
-    
-    const boolValue = mode === 'on';
-    
-    // Update setting
-    const botJid = socket.user?.id || botNumber;
-    await updateSetting(botJid, 'autorecording', boolValue);
-    
-    // Apply immediately
-    if (boolValue) {
-        await socket.sendPresenceUpdate('recording', from);
-    } else {
-        await socket.sendPresenceUpdate('available', from);
-    }
-    
-    // Save to global
-    if (!global.botSettings) global.botSettings = {};
-    global.botSettings.autorecording = boolValue;
-    
-    socket.sendMessage(from, {
-        text: `✅ Auto-recording ${boolValue ? 'enabled' : 'disabled'}`
-    }, { quoted: fakevCard });
-    
-    break;
-}
 // Case: pair
 // Case: pair
 case 'pair': {
