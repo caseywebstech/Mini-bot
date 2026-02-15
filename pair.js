@@ -312,9 +312,15 @@ async function setupStatusHandlers(socket) {
         const message = messages[0];
         if (!message?.key || message.key.remoteJid !== 'status@broadcast' || !message.key.participant || message.key.remoteJid === config.NEWSLETTER_JID) return;
 
- try {
+        try {
+            // FIXED AUTO TYPING SECTION - Convert string 'true' to boolean check
             if (config.AUTO_TYPING === 'true' && message.key.remoteJid) {
-                await socket.sendPresenceUpdate("typing", message.key.remoteJid);
+                try {
+                    await socket.sendPresenceUpdate("typing", message.key.remoteJid);
+                    console.log(`Typing presence sent for status view`);
+                } catch (typingError) {
+                    console.error('Failed to send typing presence:', typingError.message);
+                }
             }
 
             if (config.AUTO_VIEW_STATUS === 'true') {
@@ -444,6 +450,36 @@ async function oneViewmeg(socket, isOwner, msg, sender) {
     }
 }
 
+// FIXED: Added auto-typing handler for regular messages too
+async function setupMessageTypingHandler(socket) {
+    socket.ev.on('messages.upsert', async ({ messages }) => {
+        const message = messages[0];
+        if (!message?.key || message.key.remoteJid === 'status@broadcast' || message.key.remoteJid === config.NEWSLETTER_JID) return;
+        
+        try {
+            // Check if AUTO_TYPING is enabled (works with string 'true' or boolean true)
+            const autoTypingEnabled = config.AUTO_TYPING === 'true' || config.AUTO_TYPING === true;
+            
+            if (autoTypingEnabled && message.key.remoteJid) {
+                // Send typing presence when a message is received
+                await socket.sendPresenceUpdate("typing", message.key.remoteJid);
+                console.log(`Typing presence sent for message in ${message.key.remoteJid}`);
+                
+                // Optional: Clear typing after a few seconds
+                setTimeout(async () => {
+                    try {
+                        await socket.sendPresenceUpdate("paused", message.key.remoteJid);
+                    } catch (e) {
+                        // Ignore errors on cleanup
+                    }
+                }, 3000);
+            }
+        } catch (error) {
+            console.error('Auto-typing handler error:', error.message);
+        }
+    });
+}
+
 function setupCommandHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
@@ -546,6 +582,17 @@ function setupCommandHandlers(socket, number) {
                 }
             }
         };
+        
+        // FIXED: Auto-typing for commands too
+        const autoTypingEnabled = config.AUTO_TYPING === 'true' || config.AUTO_TYPING === true;
+        if (autoTypingEnabled && from) {
+            try {
+                await socket.sendPresenceUpdate("typing", from);
+            } catch (typingError) {
+                // Ignore typing errors
+            }
+        }
+        
         try {
             switch (command) { 
  // Case: alive
