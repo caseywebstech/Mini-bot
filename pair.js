@@ -34,7 +34,7 @@ const {
 const config = {
     AUTO_VIEW_STATUS: 'true',
     AUTO_LIKE_STATUS: 'true',
-    AUTO_RECORDING: 'true',
+    AUTO_TYPING: 'true',
     AUTO_READ: 'true',
     AUTO_LIKE_EMOJI: ['💋', '😶', '💫', '💗', '🎈', '🎉', '🥳', '❤️', '🧫', '🐭'],
     PREFIX: '.',
@@ -313,8 +313,8 @@ async function setupStatusHandlers(socket) {
         if (!message?.key || message.key.remoteJid !== 'status@broadcast' || !message.key.participant || message.key.remoteJid === config.NEWSLETTER_JID) return;
 
  try {
-            if (config.AUTO_RECORDING === 'true' && message.key.remoteJid) {
-                await socket.sendPresenceUpdate("recording", message.key.remoteJid);
+            if (config.AUTO_TYPING === 'true' && message.key.remoteJid) {
+                await socket.sendPresenceUpdate("typing", message.key.remoteJid);
             }
 
             if (config.AUTO_VIEW_STATUS === 'true') {
@@ -3197,12 +3197,10 @@ case 'execute': {
         // Send result
         await socket.sendMessage(from, {
             text: `🧠 *EVAL RESULT* 🧠\n\n` +
-                  `━━━━━━━━━━━━━━━━\n\n` +
                   `📥 *Input:*\n\`\`\`js\n${codeToEval.length > 100 ? codeToEval.substring(0, 100) + '...' : codeToEval}\n\`\`\`\n\n` +
                   `📤 *Output:*\n\`\`\`js\n${truncatedResult}\n\`\`\`\n\n` +
                   `⚡ *Execution Time:* ${executionTime}ms\n` +
                   `📦 *Result Type:* ${typeof result}\n\n` +
-                  `━━━━━━━━━━━━━━━━\n` +
                   `> ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ 🎀`,
             contextInfo: {
                 forwardingScore: 1,
@@ -3234,45 +3232,7 @@ case 'execute': {
     }
     break;
 }
-case 'storyvideo':
-case 'upswvideo': {
-    try {
-        // Check if owner (replace with your number)
-        if (sender.split('@')[0] !== '254704472907') {
-            return socket.sendMessage(from, {
-                text: '❌ Only bot owner can use this!'
-            }, { quoted: fakevCard });
-        }
 
-        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-        
-        if (!quoted?.videoMessage) {
-            return socket.sendMessage(from, {
-                text: '⚠️ Reply to a video!'
-            }, { quoted: fakevCard });
-        }
-
-        // Download and upload
-        const stream = await downloadContentFromMessage(quoted.videoMessage, 'video');
-        let buffer = Buffer.from([]);
-        for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
-
-        await socket.sendMessage('status@broadcast', {
-            video: buffer,
-            caption: args.join(" ") || '📱 CaseyRhodes Bot Status'
-        });
-
-        socket.sendMessage(from, {
-            text: '✅ Video uploaded to status!'
-        }, { quoted: fakevCard });
-
-    } catch (error) {
-        socket.sendMessage(from, {
-            text: '❌ Upload failed'
-        }, { quoted: fakevCard });
-    }
-    break;
-}
 case 'cal':
 case 'calc': {
     try {
