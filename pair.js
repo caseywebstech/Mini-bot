@@ -16,7 +16,6 @@ const axios = require('axios');
 const FormData = require("form-data");
 const os = require('os'); 
 const { tmpdir } = require('os');
-const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const { sms, downloadMediaMessage } = require("./msg");
 const {
     default: makeWASocket,
