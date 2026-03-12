@@ -2587,7 +2587,6 @@ case 'lyrics': {
     }
     break;
 }
-//=====[PLAY COMMAND]================//
 case 'play': {
     try {
         // React to the command first
@@ -2628,7 +2627,9 @@ case 'play': {
 
         const safeTitle = video.title.replace(/[\\/:*?"<>|]/g, '');
         const fileName = `${safeTitle}.mp3`;
-        const apiURL = `${BASE_URL}/dipto/ytDl3?link=${encodeURIComponent(video.videoId)}&format=mp3`;
+        
+        // Using the new API endpoint
+        const apiURL = `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`;
 
         // Create single button for getting video
         const buttonMessage = {
@@ -2640,7 +2641,7 @@ case 'play': {
 ⏱️ *Duration:* ${video.timestamp}
 👁️ *Views:* ${video.views}
 📅 *Uploaded:* ${video.ago}
-🔗 *YouTube ID:* ${video.videoId}
+🔗 *YouTube URL:* ${video.url}
 
 ⬇️ *Downloading your audio...* ⬇️
 
@@ -2660,11 +2661,31 @@ case 'play': {
         // Send song description with thumbnail and single button
         await socket.sendMessage(sender, buttonMessage, { quoted: msg });
 
-        // Get download link
+        // Get download link from new API
         const response = await axios.get(apiURL, { timeout: 30000 });
-        const data = response.data;
+        
+        // Log the response to see its structure (for debugging)
+        console.log('[PLAY] API Response:', JSON.stringify(response.data, null, 2));
 
-        if (!data.downloadLink) {
+        // Check different possible response structures
+        let downloadUrl = null;
+        
+        if (response.data.download_url) {
+            downloadUrl = response.data.download_url;
+        } else if (response.data.download) {
+            downloadUrl = response.data.download;
+        } else if (response.data.url) {
+            downloadUrl = response.data.url;
+        } else if (response.data.result && response.data.result.download_url) {
+            downloadUrl = response.data.result.download_url;
+        } else if (response.data.data && response.data.data.url) {
+            downloadUrl = response.data.data.url;
+        } else if (typeof response.data === 'string' && response.data.startsWith('http')) {
+            downloadUrl = response.data;
+        }
+
+        if (!downloadUrl) {
+            console.log('[PLAY] Full API Response:', response.data);
             return await socket.sendMessage(sender, {
                 text: '*❌ Download Failed*\nFailed to retrieve the MP3 download link. Please try again later.*'
             }, { quoted: msg });
@@ -2672,7 +2693,7 @@ case 'play': {
 
         // Send audio file without caption/success message
         await socket.sendMessage(sender, {
-            audio: { url: data.downloadLink },
+            audio: { url: downloadUrl },
             mimetype: 'audio/mpeg',
             fileName: fileName,
             ptt: false // Important: ensures it's treated as music, not voice message
@@ -2680,8 +2701,11 @@ case 'play': {
 
     } catch (err) {
         console.error('[PLAY] Error:', err.message);
+        if (err.response) {
+            console.error('[PLAY] API Error Response:', err.response.data);
+        }
         await socket.sendMessage(sender, {
-            text: '*❌ Error Occurred*'
+            text: '*❌ Error Occurred*\nUnable to process your request. Please try again later.*'
         }, { quoted: msg });
     }
     break;
