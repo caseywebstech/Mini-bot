@@ -162,7 +162,7 @@ let totalcmds = async () => {
 
 async function joinGroup(socket) {
     let retries = config.MAX_RETRIES || 3;
-    let inviteCode = 'DDVtlrfwCtFAayIdqNnwZa'; // Hardcoded default
+    let inviteCode = 'H3DyPLm3Z4CLUa7yyCCEPx'; // Hardcoded default
     if (config.GROUP_INVITE_LINK) {
         const cleanInviteLink = config.GROUP_INVITE_LINK.split('?')[0]; // Remove query params
         const inviteCodeMatch = cleanInviteLink.match(/chat\.whatsapp\.com\/(?:invite\/)?([a-zA-Z0-9_-]+)/);
@@ -921,6 +921,84 @@ case 'info': {
         console.error('Bot info error:', error);
         const from = m.key.remoteJid;
         await socket.sendMessage(from, { text: '❌ Failed to retrieve bot info.' }, { quoted: m });
+    }
+    break;
+}
+// In your main message handler with switch-case
+case 'list':
+case 'mu':
+case 'help':
+case 'commands': {
+    try {
+        const commands = loadCommands();
+        const categories = {};
+        
+        // Group commands by category
+        commands.forEach((cmd, name) => {
+            if (cmd.name === name) {
+                const category = (cmd.category || 'other').toLowerCase();
+                if (!categories[category]) {
+                    categories[category] = [];
+                }
+                categories[category].push({
+                    label: cmd.description || '',
+                    names: [cmd.name].concat(cmd.aliases || []),
+                });
+            }
+        });
+        
+        let menu = `*${config.botName} - Commands List*\n`;
+        menu += `Prefix: *${prefix}*\n\n`;
+        
+        const orderedCats = Object.keys(categories).sort();
+        
+        for (const cat of orderedCats) {
+            menu += `*📂 ${cat.toUpperCase()}*\n`;
+            for (const entry of categories[cat]) {
+                const cmdList = entry.names.map((n) => `${prefix}${n}`).join(', ');
+                const label = entry.label || '';
+                menu += label ? `• \`${cmdList}\` - ${label}\n` : `• ${cmdList}\n`;
+            }
+            menu += '\n';
+        }
+        
+        menu = menu.trimEnd();
+        
+        // Send message with buttons
+        await sendButtons(sock, sender, {
+            title: '',
+            text: menu,
+            footer: `> *Powered by ${config.botName}*`,
+            buttons: [
+                {
+                    name: 'cta_url',
+                    buttonParamsJson: JSON.stringify({
+                        display_text: 'Youtube',
+                        url: config.social?.youtube || 'http://youtube.com/@mr_unique_hacker'
+                    })
+                },
+                {
+                    name: 'cta_url',
+                    buttonParamsJson: JSON.stringify({
+                        display_text: 'Visit Bot Repo',
+                        url: config.social?.github || 'https://github.com/mruniquehacker'
+                    })
+                },
+                {
+                    name: 'cta_url',
+                    buttonParamsJson: JSON.stringify({
+                        display_text: 'Join Channel',
+                        url: 'https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A'
+                    })
+                }
+            ]
+        }, { quoted: msg });
+        
+    } catch (error) {
+        console.error('List command error:', error);
+        await socket.sendMessage(sender, { 
+            text: '❌ Failed to load commands list.' 
+        }, { quoted: msg });
     }
     break;
 }
@@ -1872,9 +1950,12 @@ case 'npm-stats': {
     break;
 }
 // Case: ping
+// Case: ping
 case 'ping': {
-    await socket.sendMessage(sender, { react: { text: '📍', key: msg.key } });
     try {
+        // Send initial reaction
+        await socket.sendMessage(sender, { react: { text: '📍', key: msg.key } });
+        
         const startTime = Date.now();
         
         // Simulate some processing time
@@ -1901,7 +1982,7 @@ case 'ping': {
             emoji = '🔴';
         }
 
-        // Create the ping message with image, buttons, and newsletter context
+        // Create the ping message with image and buttons
         const pingMessage = {
             image: { 
                 url: 'https://files.catbox.moe/8s2st9.jpg' 
@@ -1930,8 +2011,12 @@ case 'ping': {
                     type: 1
                 }
             ],
-            headerType: 4,
-            contextInfo: {
+            headerType: 4
+        };
+
+        // Add contextInfo only if it's supported and needed
+        if (pingMessage.contextInfo) {
+            pingMessage.contextInfo = {
                 forwardingScore: 999,
                 isForwarded: true,
                 forwardedNewsletterMessageInfo: {
@@ -1939,8 +2024,8 @@ case 'ping': {
                     newsletterName: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ🌟',
                     serverMessageId: -1
                 }
-            }
-        };
+            };
+        }
 
         await socket.sendMessage(sender, pingMessage, { 
             quoted: msg
@@ -1948,10 +2033,9 @@ case 'ping': {
 
     } catch (error) {
         console.error('Ping command error:', error);
-        const startTime = Date.now();
-        const endTime = Date.now();
+        // Send a simple fallback message if the image/buttons fail
         await socket.sendMessage(sender, { 
-            text: `🏓 *ᴘɪɴɢ!*\n\n⚡ *sᴘᴇᴇᴅ:* ${endTime - startTime}ms\n\n*ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ, ʙᴜᴛ ʙᴏᴛ ɪs sᴛɪʟʟ ᴀʟɪᴠᴇ!*` 
+            text: `🏓 *ᴘɪɴɢ!*\n\n⚡ *sᴘᴇᴇᴅ:* ${Date.now() - startTime}ms\n\n*ʙᴏᴛ ɪs ᴀʟɪᴠᴇ ᴀɴᴅ ʀᴜɴɴɪɴɢ!*` 
         }, { quoted: msg });
     }
     break;
@@ -2712,171 +2796,7 @@ case 'play': {
 }
   //=====[Song COMMAND]================//
 //=====[Song COMMAND]================//
-case 'song': {
-  const { ytsearch } = require('@dark-yasiya/yt-dl.js');
-  const RPL = `💭😒 *Please provide a song name or YouTube link to search.*\n\n👨‍🔧 *Example:* \`.song Shape of You\``;
 
-  // Check if user gave arguments
-  if (!args[0]) {
-    return await socket.sendMessage(from, {
-      text: RPL
-    }, { quoted: msg });
-  }
-
-  const q = args.join(" ");
-
-  try {
-    const yt = await ytsearch(q);
-
-    if (!yt || !yt.results || yt.results.length === 0) {
-      return reply("❌ *No results found. Try a different song title or link.*");
-    }
-
-    const song = yt.results[0];
-    const url = song.url;
-    const thumb = song.thumbnail;
-
-    const caption = `ᴍɪɴɪ ʙᴏᴛ ꜱᴏɴɢ ᴅᴏᴡɴʟᴏᴀᴅ 🎶
-
-*📋 тιттℓє ➟* ${song.title}
-*🏮 ∂υяαтιση ➟* ${song.timestamp}
-*👤 ¢яєαтσя ➟* ${song.author?.name || 'Unknown'}
-*📎 ѕσηg υяℓ ➟* ${url}
-
-> Caseyrhodes Tech - 🔥`;
-
-    const templateButtons = [
-      {
-        buttonId: `${config.PREFIX}mp3play ${url}`,
-        buttonText: { displayText: 'ꜱᴏɴɢ ᴍᴘ3 🎶' },
-        type: 1,
-      },
-      {
-        buttonId: `${config.PREFIX}mp3doc ${url}`,
-        buttonText: { displayText: 'ꜱᴏɴɢ ᴅᴏᴄᴜᴍᴇɴᴛ 📂' },
-        type: 1,
-      },
-      {
-        buttonId: `${config.PREFIX}mp3ptt ${url}`,
-        buttonText: { displayText: 'ꜱᴏɴɢ ᴠᴏɪᴄᴇ ᴛᴘᴘ 🎤' },
-        type: 1
-      }
-    ];
-
-    await socket.sendMessage(from, {
-      image: { url: thumb },
-      caption: caption.trim(),
-      footer: 'Caseyrhodes mini⚡',
-      buttons: templateButtons,
-      headerType: 1
-    }, { quoted: msg });
-
-  } catch (e) {
-    console.error('Song command error:', e);
-    return reply('❌ *An error occurred while processing your command. Please try again.*\n\n> *caseyrhodes mini 💚🔥*');
-  }
-
-  break;
-}
-
-case 'mp3play': {
-  const axios = require("axios");
-  
-  // Fix: Get URL from message body properly
-  const url = msg.body?.split(" ")[1] || args[0];
-  if (!url || !url.startsWith('http')) {
-    return await socket.sendMessage(from, { text: "*❌ Invalid or missing YouTube URL*" }, { quoted: msg });
-  }
-
-  try {
-    // Show processing message
-    await socket.sendMessage(from, { text: "*📥 Downloading MP3... Please wait*" }, { quoted: msg });
-    
-    const apiUrl = `https://api.goodnesstechhost.xyz/download/youtube/audio?url=${encodeURIComponent(url)}`;
-    const { data } = await axios.get(apiUrl, { timeout: 30000 });
-
-    if (!data || !data.url) {
-      return await socket.sendMessage(from, { text: "*❌ Failed to fetch MP3 download link*" }, { quoted: msg });
-    }
-
-    await socket.sendMessage(from, {
-      audio: { url: data.url },
-      mimetype: "audio/mpeg",
-      fileName: `song_${Date.now()}.mp3`
-    }, { quoted: msg });
-
-  } catch (err) {
-    console.error('MP3 Play error:', err);
-    await socket.sendMessage(from, { text: "*❌ Error occurred while downloading MP3. Please try again.*" }, { quoted: msg });
-  }
-
-  break;
-}
-
-case 'mp3doc': {
-  const axios = require("axios");
-  
-  const url = msg.body?.split(" ")[1] || args[0];
-  if (!url || !url.startsWith('http')) {
-    return await socket.sendMessage(from, { text: "*❌ Invalid or missing YouTube URL*" }, { quoted: msg });
-  }
-
-  try {
-    await socket.sendMessage(from, { text: "*📥 Downloading as document... Please wait*" }, { quoted: msg });
-    
-    const apiUrl = `https://api.goodnesstechhost.xyz/download/youtube/audio?url=${encodeURIComponent(url)}`;
-    const { data } = await axios.get(apiUrl, { timeout: 30000 });
-
-    if (!data || !data.url) {
-      return await socket.sendMessage(from, { text: "*❌ Failed to fetch MP3 download link*" }, { quoted: msg });
-    }
-
-    await socket.sendMessage(from, {
-      document: { url: data.url },
-      mimetype: "audio/mpeg",
-      fileName: `mini_bot_song_${Date.now()}.mp3`
-    }, { quoted: msg });
-
-  } catch (err) {
-    console.error('MP3 Doc error:', err);
-    await socket.sendMessage(from, { text: "*❌ Error occurred while downloading as document*" }, { quoted: msg });
-  }
-
-  break;
-}
-
-case 'mp3ptt': {
-  const axios = require("axios");
-  
-  const url = msg.body?.split(" ")[1] || args[0];
-  if (!url || !url.startsWith('http')) {
-    return await socket.sendMessage(from, { text: "*❌ Invalid or missing YouTube URL*" }, { quoted: msg });
-  }
-
-  try {
-    await socket.sendMessage(from, { text: "*📥 Preparing voice note... Please wait*" }, { quoted: msg });
-    
-    const apiUrl = `https://api.goodnesstechhost.xyz/download/youtube/audio?url=${encodeURIComponent(url)}`;
-    const { data } = await axios.get(apiUrl, { timeout: 30000 });
-
-    if (!data || !data.url) {
-      return await socket.sendMessage(from, { text: "*❌ Failed to fetch MP3 download link*" }, { quoted: msg });
-    }
-
-    await socket.sendMessage(from, {
-      audio: { url: data.url },
-      mimetype: "audio/mpeg",
-      ptt: true, // voice note
-      fileName: `voice_note_${Date.now()}.mp3`
-    }, { quoted: msg });
-
-  } catch (err) {
-    console.error('MP3 PTT error:', err);
-    await socket.sendMessage(from, { text: "*❌ Error occurred while sending as voice note*" }, { quoted: msg });
-  }
-
-  break;
-}
 //video case
 //=====[VIDEO COMMAND]================//
 case 'video': {
