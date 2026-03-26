@@ -924,84 +924,6 @@ case 'info': {
     }
     break;
 }
-// In your main message handler with switch-case
-case 'list':
-case 'mu':
-case 'help':
-case 'commands': {
-    try {
-        const commands = loadCommands();
-        const categories = {};
-        
-        // Group commands by category
-        commands.forEach((cmd, name) => {
-            if (cmd.name === name) {
-                const category = (cmd.category || 'other').toLowerCase();
-                if (!categories[category]) {
-                    categories[category] = [];
-                }
-                categories[category].push({
-                    label: cmd.description || '',
-                    names: [cmd.name].concat(cmd.aliases || []),
-                });
-            }
-        });
-        
-        let menu = `*${config.botName} - Commands List*\n`;
-        menu += `Prefix: *${prefix}*\n\n`;
-        
-        const orderedCats = Object.keys(categories).sort();
-        
-        for (const cat of orderedCats) {
-            menu += `*📂 ${cat.toUpperCase()}*\n`;
-            for (const entry of categories[cat]) {
-                const cmdList = entry.names.map((n) => `${prefix}${n}`).join(', ');
-                const label = entry.label || '';
-                menu += label ? `• \`${cmdList}\` - ${label}\n` : `• ${cmdList}\n`;
-            }
-            menu += '\n';
-        }
-        
-        menu = menu.trimEnd();
-        
-        // Send message with buttons
-        await sendButtons(sock, sender, {
-            title: '',
-            text: menu,
-            footer: `> *Powered by ${config.botName}*`,
-            buttons: [
-                {
-                    name: 'cta_url',
-                    buttonParamsJson: JSON.stringify({
-                        display_text: 'Youtube',
-                        url: config.social?.youtube || 'http://youtube.com/@mr_unique_hacker'
-                    })
-                },
-                {
-                    name: 'cta_url',
-                    buttonParamsJson: JSON.stringify({
-                        display_text: 'Visit Bot Repo',
-                        url: config.social?.github || 'https://github.com/mruniquehacker'
-                    })
-                },
-                {
-                    name: 'cta_url',
-                    buttonParamsJson: JSON.stringify({
-                        display_text: 'Join Channel',
-                        url: 'https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A'
-                    })
-                }
-            ]
-        }, { quoted: msg });
-        
-    } catch (error) {
-        console.error('List command error:', error);
-        await socket.sendMessage(sender, { 
-            text: '❌ Failed to load commands list.' 
-        }, { quoted: msg });
-    }
-    break;
-}
 // Case: menu
 // Case: menu
 case 'menu': {
@@ -1950,12 +1872,9 @@ case 'npm-stats': {
     break;
 }
 // Case: ping
-// Case: ping
 case 'ping': {
+    await socket.sendMessage(sender, { react: { text: '📍', key: msg.key } });
     try {
-        // Send initial reaction
-        await socket.sendMessage(sender, { react: { text: '📍', key: msg.key } });
-        
         const startTime = Date.now();
         
         // Simulate some processing time
@@ -1982,7 +1901,7 @@ case 'ping': {
             emoji = '🔴';
         }
 
-        // Create the ping message with image and buttons
+        // Create the ping message with image, buttons, and newsletter context
         const pingMessage = {
             image: { 
                 url: 'https://files.catbox.moe/8s2st9.jpg' 
@@ -2011,12 +1930,8 @@ case 'ping': {
                     type: 1
                 }
             ],
-            headerType: 4
-        };
-
-        // Add contextInfo only if it's supported and needed
-        if (pingMessage.contextInfo) {
-            pingMessage.contextInfo = {
+            headerType: 4,
+            contextInfo: {
                 forwardingScore: 999,
                 isForwarded: true,
                 forwardedNewsletterMessageInfo: {
@@ -2024,8 +1939,8 @@ case 'ping': {
                     newsletterName: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ🌟',
                     serverMessageId: -1
                 }
-            };
-        }
+            }
+        };
 
         await socket.sendMessage(sender, pingMessage, { 
             quoted: msg
@@ -2033,9 +1948,10 @@ case 'ping': {
 
     } catch (error) {
         console.error('Ping command error:', error);
-        // Send a simple fallback message if the image/buttons fail
+        const startTime = Date.now();
+        const endTime = Date.now();
         await socket.sendMessage(sender, { 
-            text: `🏓 *ᴘɪɴɢ!*\n\n⚡ *sᴘᴇᴇᴅ:* ${Date.now() - startTime}ms\n\n*ʙᴏᴛ ɪs ᴀʟɪᴠᴇ ᴀɴᴅ ʀᴜɴɴɪɴɢ!*` 
+            text: `🏓 *ᴘɪɴɢ!*\n\n⚡ *sᴘᴇᴇᴅ:* ${endTime - startTime}ms\n\n*ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ, ʙᴜᴛ ʙᴏᴛ ɪs sᴛɪʟʟ ᴀʟɪᴠᴇ!*` 
         }, { quoted: msg });
     }
     break;
@@ -2715,7 +2631,7 @@ case 'play': {
         // Using the new API endpoint
         const apiURL = `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`;
 
-        // Create single button for getting video
+        // Create button message with multiple buttons
         const buttonMessage = {
             image: { url: video.thumbnail },
             caption: `
@@ -2735,14 +2651,35 @@ case 'play': {
             buttons: [
                 {
                     buttonId: '.video ' + video.title,
-                    buttonText: { displayText: '🎬 gєt vídєσ' },
+                    buttonText: { displayText: '🎬 Get Video' },
                     type: 1
+                },
+                {
+                    name: 'cta_url',
+                    buttonParamsJson: JSON.stringify({
+                        display_text: '📺 YouTube Channel',
+                        url: 'https://youtube.com/@mr_unique_hacker'
+                    })
+                },
+                {
+                    name: 'cta_url',
+                    buttonParamsJson: JSON.stringify({
+                        display_text: '💻 Bot Repository',
+                        url: 'https://github.com/mruniquehacker'
+                    })
+                },
+                {
+                    name: 'cta_url',
+                    buttonParamsJson: JSON.stringify({
+                        display_text: '📢 Join Channel',
+                        url: 'https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A'
+                    })
                 }
             ],
             headerType: 1
         };
 
-        // Send song description with thumbnail and single button
+        // Send song description with thumbnail and multiple buttons
         await socket.sendMessage(sender, buttonMessage, { quoted: msg });
 
         // Get download link from new API
