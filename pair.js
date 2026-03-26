@@ -2631,7 +2631,7 @@ case 'play': {
         // Using the new API endpoint
         const apiURL = `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`;
 
-        // Create button message with multiple buttons
+        // Create single button for getting video
         const buttonMessage = {
             image: { url: video.thumbnail },
             caption: `
@@ -2651,35 +2651,14 @@ case 'play': {
             buttons: [
                 {
                     buttonId: '.video ' + video.title,
-                    buttonText: { displayText: '🎬 Get Video' },
+                    buttonText: { displayText: '🎬 gєt vídєσ' },
                     type: 1
-                },
-                {
-                    name: 'cta_url',
-                    buttonParamsJson: JSON.stringify({
-                        display_text: '📺 YouTube Channel',
-                        url: 'https://youtube.com/@mr_unique_hacker'
-                    })
-                },
-                {
-                    name: 'cta_url',
-                    buttonParamsJson: JSON.stringify({
-                        display_text: '💻 Bot Repository',
-                        url: 'https://github.com/mruniquehacker'
-                    })
-                },
-                {
-                    name: 'cta_url',
-                    buttonParamsJson: JSON.stringify({
-                        display_text: '📢 Join Channel',
-                        url: 'https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A'
-                    })
                 }
             ],
             headerType: 1
         };
 
-        // Send song description with thumbnail and multiple buttons
+        // Send song description with thumbnail and single button
         await socket.sendMessage(sender, buttonMessage, { quoted: msg });
 
         // Get download link from new API
