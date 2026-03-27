@@ -2587,7 +2587,6 @@ case 'lyrics': {
     }
     break;
 }
-
 case 'play': {
     try {
         // React to the command first
@@ -2682,12 +2681,12 @@ case 'play': {
             }, { quoted: msg });
         }
 
-        // Send audio file
+        // Send audio as document
         await socket.sendMessage(sender, {
-            audio: { url: downloadUrl },
+            document: { url: downloadUrl },
             mimetype: 'audio/mpeg',
             fileName: fileName,
-            ptt: false
+            caption: `🎵 *${video.title}*\n\n⏱️ Duration: ${video.timestamp}\n👁️ Views: ${video.views}`
         });
 
     } catch (err) {
