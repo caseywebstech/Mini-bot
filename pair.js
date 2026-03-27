@@ -2629,7 +2629,7 @@ case 'play': {
         const fileName = `${safeTitle}.mp3`;
         
         // Using the new API endpoint
-        const apiURL = `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`;
+        const apiURL = `https://api.vreden.my.id/api/v1/download/play/audio?query=${encodeURIComponent(video.url)}`;
 
         // Create single button for getting video
         const buttonMessage = {
