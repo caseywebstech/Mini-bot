@@ -840,6 +840,134 @@ case 'deb64': {
     }
     break;
 }
+// Take Command - Case Command Format (Steal a sticker and re-pack)
+case 'take':
+case 'steal': {
+    try {
+        // Get the quoted message
+        let targetMessage = msg;
+        const ctxInfo = msg.message?.extendedTextMessage?.contextInfo;
+        
+        if (ctxInfo?.quotedMessage) {
+            targetMessage = {
+                key: { 
+                    remoteJid: sender, 
+                    id: ctxInfo.stanzaId, 
+                    participant: ctxInfo.participant 
+                },
+                message: ctxInfo.quotedMessage,
+            };
+        }
+        
+        const stickerMsg = targetMessage.message?.stickerMessage;
+        
+        if (!stickerMsg) {
+            await socket.sendMessage(sender, { 
+                text: '🎭 *Ｒᴇᴘʟʏ ᴛᴏ ᴀ sᴛɪᴄᴋᴇʀ* ᴡɪᴛʜ `.take` ᴛᴏ sᴛᴇᴀʟ ɪᴛ.' 
+            }, { quoted: msg });
+            break;
+        }
+        
+        try {
+            // Download the sticker
+            const mediaBuffer = await downloadMediaMessage(
+                targetMessage,
+                'buffer',
+                {},
+                { logger: undefined, reuploadRequest: socket.updateMediaMessage },
+            );
+            
+            if (!mediaBuffer) {
+                await socket.sendMessage(sender, { 
+                    text: '❌ *Fᴀɪʟᴇᴅ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ sᴛɪᴄᴋᴇʀ.* Pʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ.' 
+                }, { quoted: msg });
+                break;
+            }
+            
+            // Get user name or custom packname
+            const userName = msg.pushName || sender.split('@')[0];
+            const packname = args.length ? args.join(' ') : userName;
+            
+            // Process the sticker
+            const img = new webp.Image();
+            await img.load(mediaBuffer);
+            
+            const json = {
+                'sticker-pack-id': crypto.randomBytes(32).toString('hex'),
+                'sticker-pack-name': packname,
+                'sticker-pack-publisher': config.botName || 'CaseyRhodes Mini Bot',
+                emojis: ['🎭', '🤖', '✨'],
+            };
+            
+            const exifAttr = Buffer.from([
+                0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00,
+                0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x16, 0x00, 0x00, 0x00,
+            ]);
+            
+            const jsonBuffer = Buffer.from(JSON.stringify(json), 'utf8');
+            const exif = Buffer.concat([exifAttr, jsonBuffer]);
+            exif.writeUIntLE(jsonBuffer.length, 14, 4);
+            
+            img.exif = exif;
+            const finalBuffer = await img.save(null);
+            
+            // Send the stolen sticker
+            await socket.sendMessage(sender, { 
+                sticker: finalBuffer 
+            }, { quoted: msg });
+            
+            // Optional: Send success message with buttons
+            const successMessage = {
+                text: `✅ *Sᴛɪᴄᴋᴇʀ Sᴛᴏʟᴇɴ Sᴜᴄᴄᴇssғᴜʟʟʏ!*\n\n` +
+                      `📦 *Pᴀᴄᴋɴᴀᴍᴇ:* ${packname}\n` +
+                      `👤 *Sᴛᴏʟᴇɴ ʙʏ:* ${userName}\n` +
+                      `🎭 *Eᴍᴏᴊɪ:* 🤖\n\n` +
+                      `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ${config.botName || 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ'}*`,
+                footer: `🎭 Sᴛɪᴄᴋᴇʀ Sᴛᴇᴀʟᴇʀ 🎭`,
+                buttons: [
+                    {
+                        buttonId: `${prefix}sticker`,
+                        buttonText: { 
+                            displayText: '🎨 𝐌𝐚𝐤𝐞 𝐒𝐭𝐢𝐜𝐤𝐞𝐫' 
+                        },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}take`,
+                        buttonText: { 
+                            displayText: '🔄 𝐒𝐭𝐞𝐚𝐥 𝐀𝐧𝐨𝐭𝐡𝐞𝐫' 
+                        },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}packinfo`,
+                        buttonText: { 
+                            displayText: '📦 𝐏𝐚𝐜𝐤 𝐈𝐧𝐟𝐨' 
+                        },
+                        type: 1
+                    }
+                ],
+                headerType: 1
+            };
+            
+            await socket.sendMessage(sender, successMessage, { quoted: msg });
+            
+        } catch (error) {
+            console.error('Take command error:', error);
+            await socket.sendMessage(sender, { 
+                text: '❌ *Fᴀɪʟᴇᴅ ᴛᴏ sᴛᴇᴀʟ sᴛɪᴄᴋᴇʀ.* Pʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ.' 
+            }, { quoted: msg });
+        }
+        
+    } catch (error) {
+        console.error('Take command wrapper error:', error);
+        await socket.sendMessage(sender, { 
+            text: '❌ *Aɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ.* Pʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ ʟᴀᴛᴇʀ.' 
+        }, { quoted: msg });
+    }
+    break;
+}
 // Case: bot_stats
 // Case: bot_stats
 case 'session': {
@@ -1872,86 +2000,115 @@ case 'npm-stats': {
     break;
 }
 // Case: ping
-case 'ping': {
-    await socket.sendMessage(sender, { react: { text: '📍', key: msg.key } });
+// Enhanced Ping Command with Image and Buttons - Case Command Format
+case 'ping':
+case 'p': {
     try {
-        const startTime = Date.now();
+        // Send initial reaction
+        await socket.sendMessage(sender, { 
+            react: { text: '🏓', key: msg.key } 
+        });
         
-        // Simulate some processing time
-        await new Promise(resolve => setTimeout(resolve, 100));
+        const start = Date.now();
         
-        // Calculate latency
-        const endTime = Date.now();
-        const latency = endTime - startTime;
-
-        // Determine quality based on latency
+        // Send initial ping message
+        const sent = await socket.sendMessage(sender, { 
+            text: '🏓 Ｐｉｎｇｉｎｇ...' 
+        }, { quoted: msg });
+        
+        // Simulate a bit of processing for accuracy
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        const end = Date.now();
+        const responseTime = end - start;
+        
+        // Determine quality based on response time
         let quality = '';
         let emoji = '';
-        if (latency < 100) {
-            quality = 'ᴇxᴄᴇʟʟᴇɴᴛ';
-            emoji = '🟢';
-        } else if (latency < 300) {
-            quality = 'ɢᴏᴏᴅ';
+        let qualityStyle = '';
+        let stars = '';
+        if (responseTime < 100) {
+            quality = 'Ｅｘｃｅｌｌｅｎｔ';
+            emoji = '🟢✨';
+            qualityStyle = 'ᴇxᴄᴇʟʟᴇɴᴛ';
+            stars = '★★★★★';
+        } else if (responseTime < 300) {
+            quality = 'Ｇｏｏｄ';
             emoji = '🟡';
-        } else if (latency < 600) {
-            quality = 'ғᴀɪʀ';
+            qualityStyle = 'ɢᴏᴏᴅ';
+            stars = '★★★☆☆';
+        } else if (responseTime < 600) {
+            quality = 'Ｆａｉｒ';
             emoji = '🟠';
+            qualityStyle = 'ғᴀɪʀ';
+            stars = '★★☆☆☆';
         } else {
-            quality = 'ᴘᴏᴏʀ';
+            quality = 'Ｐｏｏｒ';
             emoji = '🔴';
+            qualityStyle = 'ᴘᴏᴏʀ';
+            stars = '★☆☆☆☆';
         }
-
-        // Create the ping message with image, buttons, and newsletter context
+        
+        // Create message with IMAGE and buttons
         const pingMessage = {
             image: { 
-                url: 'https://files.catbox.moe/8s2st9.jpg' 
+                url: 'https://files.catbox.moe/8s2st9.jpg'
             },
-            caption: `🏓 *ᴘɪɴɢ!*\n\n` +
-                    `⚡ *sᴘᴇᴇᴅ:* ${latency}ms\n` +
-                    `${emoji} *ϙᴜᴀʟɪᴛʏ:* ${quality}\n` +
-                    `🕒 *ᴛɪᴍᴇsᴛᴀᴍᴘ:* ${new Date().toLocaleString('en-US', { timeZone: 'UTC', hour12: true })}\n\n` +
-                    `*╭───────────────────⊷*\n` +
-                    `*┃* 🎀 ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ 🎀 \n` +
-                    `*╰───────────────────⊷*`,
-            footer: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ🌟',
+            caption: `🏓 *ＰＯＮＧ！*\n\n` +
+                    `╭━━━━━━━━━━━━━━━━━━━━╮\n` +
+                    `┃ ⚡ *Ｒｅｓｐｏｎｓｅ:* ${responseTime}ms\n` +
+                    `┃ ${emoji} *Ｑｕａｌｉｔｙ:* ${quality}\n` +
+                    `┃ ⭐ *Ｒａｔｉｎｇ:* ${stars}\n` +
+                    `┃ 🕒 *Ｔｉｍｅ:* ${new Date().toLocaleTimeString()}\n` +
+                    `╰━━━━━━━━━━━━━━━━━━━━╯\n\n` +
+                    `> *${config.botName || 'Ｂｏｔ'} ɪs ʀᴜɴɴɪɴɢ sᴍᴏᴏᴛʜʟʏ！*\n` +
+                    `> *⚡ ${qualityStyle} ᴄᴏɴɴᴇᴄᴛɪᴏɴ*`,
+            footer: `✨ ${qualityStyle} ᴄᴏɴɴᴇᴄᴛɪᴏɴ ✨`,
             buttons: [
                 {
-                    buttonId: `${prefix}active`,
+                    buttonId: `${prefix}ping`,
                     buttonText: { 
-                        displayText: '🔮 ʙᴏᴛ ɪɴғᴏ 🔮' 
+                        displayText: '🔄 𝐑𝐞-𝐏𝐢𝐧𝐠' 
                     },
                     type: 1
                 },
                 {
-                    buttonId: `${prefix}session`, 
+                    buttonId: `${prefix}repo`,
                     buttonText: { 
-                        displayText: '📊 ʙᴏᴛ sᴛᴀᴛs 📊' 
+                        displayText: '📦 𝐑𝐞𝐩𝐨𝐬𝐢𝐭𝐨𝐫𝐲' 
+                    },
+                    type: 1
+                },
+                {
+                    buttonId: `${prefix}status`,
+                    buttonText: { 
+                        displayText: '📊 𝐁𝐨𝐭 𝐒𝐭𝐚𝐭𝐮𝐬' 
+                    },
+                    type: 1
+                },
+                {
+                    buttonId: `${prefix}help`,
+                    buttonText: { 
+                        displayText: '❓ 𝐇𝐞𝐥𝐩' 
                     },
                     type: 1
                 }
             ],
-            headerType: 4,
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '120363420261263259@newsletter',
-                    newsletterName: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ🌟',
-                    serverMessageId: -1
-                }
-            }
+            headerType: 4
         };
-
-        await socket.sendMessage(sender, pingMessage, { 
-            quoted: msg
-        });
-
+        
+        // Send the message with image and buttons
+        await socket.sendMessage(sender, pingMessage, { quoted: msg });
+        
+        // Delete the initial ping message
+        await socket.sendMessage(sender, { delete: sent.key });
+        
     } catch (error) {
         console.error('Ping command error:', error);
-        const startTime = Date.now();
-        const endTime = Date.now();
+        
+        // Fallback message without image if image fails
         await socket.sendMessage(sender, { 
-            text: `🏓 *ᴘɪɴɢ!*\n\n⚡ *sᴘᴇᴇᴅ:* ${endTime - startTime}ms\n\n*ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ, ʙᴜᴛ ʙᴏᴛ ɪs sᴛɪʟʟ ᴀʟɪᴠᴇ!*` 
+            text: `🏓 *ＰＯＮＧ！*\n\n⚡ *Ｓｐｅｅｄ:* ${Date.now() - start}ms\n\n✨ *Ｂｏᴛ ɪs ᴀʟɪᴠᴇ ᴀɴᴅ ʀᴜɴɴɪɴɢ！*` 
         }, { quoted: msg });
     }
     break;
