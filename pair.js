@@ -967,12 +967,12 @@ case 'menu': {
       buttons: [
         {
           buttonId: `${config.PREFIX}quick_commands`,
-          buttonText: { displayText: '🧬 CHOOSE CATEGORY' },
+          buttonText: { displayText: '🐺 CHOOSE CATEGORY' },
           type: 4,
           nativeFlowInfo: {
             name: 'single_select',
             paramsJson: JSON.stringify({
-              title: '🏹 CHOOSE CATEGORY',
+              title: '🐺 CHOOSE CATEGORY',
               sections: [
                 {
                   title: "🌐 ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs",
@@ -2628,7 +2628,10 @@ case 'play': {
         const safeTitle = video.title.replace(/[\\/:*?"<>|]/g, '');
         const fileName = `${safeTitle}.mp3`;
         
-        // Send song description with thumbnail
+        // Using the new API endpoint
+        const apiURL = `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`;
+
+        // Create single button for getting video
         const buttonMessage = {
             image: { url: video.thumbnail },
             caption: `
@@ -2642,51 +2645,58 @@ case 'play': {
 
 ⬇️ *Downloading your audio...* ⬇️
 
-💡 *Tip:* Use *.video to get the video version
+💡 *Tip:* Use *.video to get the video version*
             `.trim(),
             footer: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ - ᴀᴜᴅɪᴏ ᴘʟᴀʏᴇʀ',
             buttons: [
                 {
                     buttonId: '.video ' + video.title,
-                    buttonText: { displayText: '🎬 Get Video' },
+                    buttonText: { displayText: '🎬 gєt vídєσ' },
                     type: 1
                 }
             ],
             headerType: 1
         };
 
+        // Send song description with thumbnail and single button
         await socket.sendMessage(sender, buttonMessage, { quoted: msg });
 
-        // Get download link from API
-        const apiURL = `https://api.vreden.my.id/api/v1/download/play/audio?query=${encodeURIComponent(video.url)}`;
-        const response = await axios.get(apiURL, { 
-            timeout: 30000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
+        // Get download link from new API
+        const response = await axios.get(apiURL, { timeout: 30000 });
         
-        // Parse the download URL from response
-        let downloadUrl = response.data?.download_url || 
-                         response.data?.download || 
-                         response.data?.url || 
-                         response.data?.result?.download_url ||
-                         response.data?.result?.url ||
-                         response.data?.data?.url;
+        // Log the response to see its structure (for debugging)
+        console.log('[PLAY] API Response:', JSON.stringify(response.data, null, 2));
+
+        // Check different possible response structures
+        let downloadUrl = null;
+        
+        if (response.data.download_url) {
+            downloadUrl = response.data.download_url;
+        } else if (response.data.download) {
+            downloadUrl = response.data.download;
+        } else if (response.data.url) {
+            downloadUrl = response.data.url;
+        } else if (response.data.result && response.data.result.download_url) {
+            downloadUrl = response.data.result.download_url;
+        } else if (response.data.data && response.data.data.url) {
+            downloadUrl = response.data.data.url;
+        } else if (typeof response.data === 'string' && response.data.startsWith('http')) {
+            downloadUrl = response.data;
+        }
 
         if (!downloadUrl) {
-            console.log('[PLAY] API Response:', JSON.stringify(response.data, null, 2));
+            console.log('[PLAY] Full API Response:', response.data);
             return await socket.sendMessage(sender, {
                 text: '*❌ Download Failed*\nFailed to retrieve the MP3 download link. Please try again later.*'
             }, { quoted: msg });
         }
 
-        // Send audio as document
+        // Send audio file without caption/success message
         await socket.sendMessage(sender, {
-            document: { url: downloadUrl },
+            audio: { url: downloadUrl },
             mimetype: 'audio/mpeg',
             fileName: fileName,
-            caption: `🎵 *${video.title}*\n\n⏱️ Duration: ${video.timestamp}\n👁️ Views: ${video.views}`
+            ptt: false // Important: ensures it's treated as music, not voice message
         });
 
     } catch (err) {
