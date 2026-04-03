@@ -6,6 +6,8 @@ const router = express.Router();
 const fetch = require('node-fetch');
 const pino = require('pino');
 const yts = require("yt-search");
+// Add this at the top of your main file with other requires
+const { sendButtons } = require('gifted-btns');
 const cheerio = require('cheerio');
 const BASE_URL = 'https://noobs-api.top';
 const { Octokit } = require('@octokit/rest');
@@ -1054,23 +1056,34 @@ case 'info': {
 }
 // Case: menu
 // Case: menu
-case 'menu': {
-  try {
-    await socket.sendMessage(sender, { react: { text: '✨', key: msg.key } });
-    const startTime = socketCreationTime.get(number) || Date.now();
-    const uptime = Math.floor((Date.now() - startTime) / 1000);
-    const hours = Math.floor(uptime / 3600);
-    const minutes = Math.floor((uptime % 3600) / 60);
-    const seconds = Math.floor(uptime % 60);
-    const usedMemory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-    const totalMemory = Math.round(os.totalmem() / 1024 / 1024);
-    
-    let menuText = `*╭─────────────────⊷*  
+// Menu Command - Case Command Format with sendButtons Support
+case 'menu':
+case 'allmenu':
+case 'help':
+case 'commands': {
+    try {
+        // Send initial reaction
+        await socket.sendMessage(sender, { 
+            react: { text: '✨', key: msg.key } 
+        });
+        
+        const startTime = socketCreationTime.get(sender) || Date.now();
+        const uptime = Math.floor((Date.now() - startTime) / 1000);
+        const hours = Math.floor(uptime / 3600);
+        const minutes = Math.floor((uptime % 3600) / 60);
+        const seconds = Math.floor(uptime % 60);
+        const usedMemory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+        const totalMemory = Math.round(os.totalmem() / 1024 / 1024);
+        
+        // Count commands (you can implement this properly)
+        const count = Object.keys(commands || {}).length || 150;
+        
+        let menuText = `*╭─────────────────⊷*  
 *┃* *🌟ʙᴏᴛ ɴᴀᴍᴇ*: ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ
-*┃* *🌸ᴜsᴇʀ*: ɢᴜᴇsᴛ
-*┃* *📍ᴘʀᴇғɪx*: .
+*┃* *🌸ᴜsᴇʀ*: ${msg.pushName || 'ɢᴜᴇsᴛ'}
+*┃* *📍ᴘʀᴇғɪx*: ${prefix}
 *┃* *⏰ᴜᴘᴛɪᴍᴇ* : ${hours}h ${minutes}m ${seconds}s
-*┃* *📂sᴛᴏʀᴀɢᴇ* : ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
+*┃* *📂sᴛᴏʀᴀɢᴇ* : ${usedMemory}MB/${totalMemory}MB
 *┃*  🔮 *ᴄᴏᴍᴍᴀɴᴅs*: ${count}
 *┃* *🎭ᴅᴇᴠ*: ᴄᴀsᴇʏʀʜᴏᴅᴇs xᴛᴇᴄʜ
 *╰──────────────────⊷*
@@ -1078,181 +1091,251 @@ case 'menu': {
 
 > ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ ッ
 `;
-    // Common message context
-    const messageContext = {
-        forwardingScore: 1,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-            newsletterJid: '120363420261263259@newsletter',
-            newsletterName: '͏ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ🌟',
-            serverMessageId: -1
-        }
-    };
-
-    const menuMessage = {
-      image: { url: "https://i.ibb.co/gKnBmq8/casey.jpg" },
-      caption: `*🎀 𝐂𝐀𝐒𝐄𝐘𝐑𝐇𝐎𝐃𝐄𝐒 𝐌𝐈𝐍𝐈 𝐁𝐎𝐓 🎀*\n${menuText}`,
-      buttons: [
-        {
-          buttonId: `${config.PREFIX}quick_commands`,
-          buttonText: { displayText: '🐺 CHOOSE CATEGORY' },
-          type: 4,
-          nativeFlowInfo: {
-            name: 'single_select',
-            paramsJson: JSON.stringify({
-              title: '🐺 CHOOSE CATEGORY',
-              sections: [
+        
+        // Common message context
+        const messageContext = {
+            forwardingScore: 1,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: '120363420261263259@newsletter',
+                newsletterName: '͏ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ🌟',
+                serverMessageId: -1
+            }
+        };
+        
+        // First, send the main menu with category selector button
+        const menuMessage = {
+            image: { url: "https://i.ibb.co/gKnBmq8/casey.jpg" },
+            caption: `*🎀 𝐂𝐀𝐒𝐄𝐘𝐑𝐇𝐎𝐃𝐄𝐒 𝐌𝐈𝐍𝐈 𝐁𝐎𝐓 🎀*\n${menuText}`,
+            buttons: [
                 {
-                  title: "🌐 ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs",
-                  highlight_label: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ',
-                  rows: [
-                    { title: "📜 ᴀʟʟᴍᴇɴᴜ", description: "get all command in lidt", id: `${config.PREFIX}allmenu` }, 
-                    { title: "🎨 ʟᴏɢᴏ ᴍᴇɴᴜ", description: "get yoir own logo texts", id: `${config.PREFIX}logomenu` }, 
-                    { title: "🟢 ᴀʟɪᴠᴇ", description: "Check if bot is active", id: `${config.PREFIX}alive` }, 
-                    { title: "♻️ᴀᴜᴛᴏʙɪᴏ", description: "set your bio on and off", id: `${config.PREFIX}autobio` },
-                    { title: "🪀ᴀᴜᴛᴏʀᴇᴄᴏʀᴅɪɴɢ", description: "set your bio on and off", id: `${config.PREFIX}autorecording` },    
-                    { title: "🌟owner", description: "get intouch with dev", id: `${config.PREFIX}owner` },
-                    { title: "🎭ʜᴀᴄᴋ", description: "prank others", id: `${config.PREFIX}hack` },
-                    { title: "🗣️ᴄᴀʟᴄᴜʟᴀᴛᴏʀ", description: "do your own math", id: `${config.PREFIX}calculator` },
-                    { title: "📊 ʙᴏᴛ sᴛᴀᴛs", description: "View bot statistics", id: `${config.PREFIX}session` },
-                    { title: "ℹ️ ʙᴏᴛ ɪɴғᴏ", description: "Get bot information", id: `${config.PREFIX}active` },
-                    { title: "🔰sᴇᴛᴘᴘ", description: "set your own profile", id: `${config.PREFIX}setpp` },
-                    { title: "📋 ᴍᴇɴᴜ", description: "Show this menu", id: `${config.PREFIX}menu` },
-                    { title: "📜 ϙᴜʀᴀɴ", description: "List all your quran by number", id: `${config.PREFIX}quran` },
-                    { title: "🔮sᴄʀᴇᴇɴsʜᴏᴏᴛ", description: "get website screenshots", id: `${config.PREFIX}ss` },
-                    { title: "💌ғᴇᴛᴄʜ", description: "get url comtent", id: `${config.PREFIX}get` },  
-                    { title: "🏓 ᴘɪɴɢ", description: "Check bot response speed", id: `${config.PREFIX}ping` },
-                         { title: "📜 ᴘᴅғ", description: "change text to pdf", id: `${config.PREFIX}pdf` },
-                    { title: "🔗 ᴘᴀɪʀ", description: "Generate pairing code", id: `${config.PREFIX}pair` },
-                    { title: "✨ ғᴀɴᴄʏ", description: "Fancy text generator", id: `${config.PREFIX}fancy` },
-                    { title: "🔮tts", description: "voice converter", id: `${config.PREFIX}tts` },
-                    { title: "🎉ɪᴍᴀɢᴇ", description: "random image generator", id: `${config.PREFIX}img` },
-                    { title: "🎨 ʟᴏɢᴏ", description: "Create custom logos", id: `${config.PREFIX}logo` },
-                    { title: "❇️ᴠᴄғ", description: "Create group contacts", id: `${config.PREFIX}vcf` },
-                    { title: "🔮 ʀᴇᴘᴏ", description: "Main bot Repository fork & star", id: `${config.PREFIX}repo` }
-                  ]
-                },
-                {
-                  title: "🎵 ᴍᴇᴅɪᴀ ᴛᴏᴏʟs",
-                  highlight_label: 'New',
-                  rows: [
-                    { title: "🎵 sᴏɴɢ", description: "Download music from YouTube", id: `${config.PREFIX}song` }, 
-                    { title: "🎀play", description: "play favourite songs", id: `${config.PREFIX}play` },
-                    { title: "📱 ᴛɪᴋᴛᴏᴋ", description: "Download TikTok videos", id: `${config.PREFIX}tiktok` },
-                    { title: "💠ᴊɪᴅ", description:"get your own jid", id: `${config.PREFIX}jid` },
-                    { title: "📘 ғᴀᴄᴇʙᴏᴏᴋ", description: "Download Facebook content", id: `${config.PREFIX}fb` },
-                    { title: "🎀ʙɪʙʟᴇ", description: "okoka😂", id: `${config.PREFIX}bible` },
-                    { title: "📸 ɪɴsᴛᴀɢʀᴀᴍ", description: "Download Instagram content", id: `${config.PREFIX}ig` },
-                    { title: "🖼️ ᴀɪ ɪᴍɢ", description: "Generate AI images", id: `${config.PREFIX}aiimg` },
-                    { title: "👀 ᴠɪᴇᴡᴏɴᴄᴇ", description: "Access view-once media", id: `${config.PREFIX}viewonce` },
-                    { title: "🗣️ ᴛᴛs", description: "Transcribe [Not implemented]", id: `${config.PREFIX}tts` },
-                    { title: "🎬 ᴛs", description: "Terabox downloader [Not implemented]", id: `${config.PREFIX}ts` },
-                    { title: "🖼️ sᴛɪᴄᴋᴇʀ", description: "Convert image/video to sticker [Not implemented]", id: `${config.PREFIX}sticker` }
-                  ]
-                },
-                {
-                  title: "🫂 ɢʀᴏᴜᴘ sᴇᴛᴛɪɴɢs",
-                  highlight_label: 'Popular',
-                  rows: [
-                    { title: "➕ ᴀᴅᴅ", description: "Add Numbers to Group", id: `${config.PREFIX}add` },
-                    { title: "🦶 ᴋɪᴄᴋ", description: "Remove Number from Group", id: `${config.PREFIX}kick` },
-                    { title: "🔓 ᴏᴘᴇɴ", description: "Open Lock GROUP", id: `${config.PREFIX}open` },
-                    { title: "🔒 ᴄʟᴏsᴇ", description: "Close Group", id: `${config.PREFIX}close` },
-                    { title: "👑 ᴘʀᴏᴍᴏᴛᴇ", description: "Promote Member to Admin", id: `${config.PREFIX}promote` },
-                    { title: "😢 ᴅᴇᴍᴏᴛᴇ", description: "Demote Member from Admin", id: `${config.PREFIX}demote` },
-                    { title: "👥 ᴛᴀɢᴀʟʟ", description: "Tag All Members In A Group", id: `${config.PREFIX}tagall` },
-                    { title: "👤 ᴊᴏɪɴ", description: "Join A Group", id: `${config.PREFIX}join` }
-                  ]
-                },
-                {
-                  title: "📰 ɴᴇᴡs & ɪɴғᴏ",
-                  rows: [
-                    { title: "📰 ɴᴇᴡs", description: "Get latest news updates", id: `${config.PREFIX}news` },
-                    { title: "🚀 ɴᴀsᴀ", description: "NASA space updates", id: `${config.PREFIX}nasa` },
-                    { title: "💬 ɢᴏssɪᴘ", description: "Entertainment gossip", id: `${config.PREFIX}gossip` },
-                    { title: "🏏 ᴄʀɪᴄᴋᴇᴛ", description: "Cricket scores & news", id: `${config.PREFIX}cricket` },
-                    { title: "🎭 ᴀɴᴏɴʏᴍᴏᴜs", description: "Fun interaction [Not implemented]", id: `${config.PREFIX}anonymous` }
-                  ]
-                },
-                {
-                  title: "🖤 ʀᴏᴍᴀɴᴛɪᴄ, sᴀᴠᴀɢᴇ & ᴛʜɪɴᴋʏ",
-                  highlight_label: 'Fun',
-                  rows: [
-                    { title: "😂 ᴊᴏᴋᴇ", description: "Hear a lighthearted joke", id: `${config.PREFIX}joke` },
-                    { title: "🌚 ᴅᴀʀᴋ ᴊᴏᴋᴇ", description: "Get a dark humor joke", id: `${config.PREFIX}darkjoke` },
-                    { title: "🏏 ᴡᴀɪғᴜ", description: "Get a random anime waifu", id: `${config.PREFIX}waifu` },
-                    { title: "😂 ᴍᴇᴍᴇ", description: "Receive a random meme", id: `${config.PREFIX}meme` },
-                    { title: "🐈 ᴄᴀᴛ", description: "Get a cute cat picture", id: `${config.PREFIX}cat` },
-                    { title: "🐕 ᴅᴏɢ", description: "See a cute dog picture", id: `${config.PREFIX}dog` },
-                    { title: "💡 ғᴀᴄᴛ", description: "Learn a random fact", id: `${config.PREFIX}fact` },
-                    { title: "💘 ᴘɪᴄᴋᴜᴘ ʟɪɴᴇ", description: "Get a cheesy pickup line", id: `${config.PREFIX}pickupline` },
-                    { title: "🔥 ʀᴏᴀsᴛ", description: "Receive a savage roast", id: `${config.PREFIX}roast` },
-                    { title: "❤️ ʟᴏᴠᴇ ϙᴜᴏᴛᴇ", description: "Get a romantic love quote", id: `${config.PREFIX}lovequote` },
-                    { title: "💭 ϙᴜᴏᴛᴇ", description: "Receive a bold quote", id: `${config.PREFIX}quote` }
-                  ]
-                },
-                {
-                  title: "🔧 ᴛᴏᴏʟs & ᴜᴛɪʟɪᴛɪᴇs",
-                  rows: [
-                    { title: "🤖 ᴀɪ", description: "Chat with AI assistant", id: `${config.PREFIX}ai` },
-                   { title: "🚫ʙʟᴏᴄᴋ", description: "block", id: `${config.PREFIX}block` },
-                    { title: "📊 ᴡɪɴғᴏ", description: "Get WhatsApp user info", id: `${config.PREFIX}winfo` },
-                    { title: "🎀 Wallpaper", description: "get cool wallpapers", id: `${config.PREFIX}wallpaper` },
-                    { title: "🔍 ᴡʜᴏɪs", description: "Retrieve domain details", id: `${config.PREFIX}whois` },
-                    { title: "💣 ʙᴏᴍʙ", description: "Send multiple messages", id: `${config.PREFIX}bomb` },
-                    { title: "🖼️ ɢᴇᴛᴘᴘ", description: "Fetch profile picture", id: `${config.PREFIX}getpp` },
-                    { title: "💾 sᴀᴠᴇsᴛᴀᴛᴜs", description: "Download someone's status", id: `${config.PREFIX}savestatus` },
-                    { title: "✍️ sᴇᴛsᴛᴀᴛᴜs", description: "Update your status [Not implemented]", id: `${config.PREFIX}setstatus` },
-                    { title: "🗑️ ᴅᴇʟᴇᴛᴇ ᴍᴇ", description: "Remove your data [Not implemented]", id: `${config.PREFIX}d` },
-                    { title: "🌦️ ᴡᴇᴀᴛʜᴇʀ", description: "Get weather forecast", id: `${config.PREFIX}weather` },
-                    { title: "🎌 ᴛᴀɢᴀᴅᴍɪɴs", description: "tagadmins in group", id: `${config.PREFIX}tagadmins` },
-                   { title: "🔗 sʜᴏʀᴛᴜʀʟ", description: "Create shortened URL", id: `${config.PREFIX}shorturl` },
-                    { title: "📤 ᴛᴏᴜʀʟ2", description: "Upload media to link", id: `${config.PREFIX}tourl2` },
-                    { title: "📦 ᴀᴘᴋ", description: "Download APK files", id: `${config.PREFIX}apk` },   
-                    { title: "🧾lyrics", description: "generate lyrics", id: `${config.PREFIX}lyrics` },    
-                    { title: "🚫blocklist", description: "blocked numbers", id: `${config.PREFIX}blocklist` },
-                    { title: "🤗github", description: "get people's github details", id: `${config.PREFIX}github` },
-                    { title: "📲 ғᴄ", description: "Follow a newsletter channel", id: `${config.PREFIX}fc` }
-                  ]
+                    buttonId: `${prefix}quick_commands`,
+                    buttonText: { displayText: '🐺 CHOOSE CATEGORY' },
+                    type: 4,
+                    nativeFlowInfo: {
+                        name: 'single_select',
+                        paramsJson: JSON.stringify({
+                            title: '🐺 CHOOSE CATEGORY',
+                            sections: [
+                                {
+                                    title: "🌐 ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs",
+                                    highlight_label: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ',
+                                    rows: [
+                                        { title: "📜 ᴀʟʟᴍᴇɴᴜ", description: "get all command in list", id: `${prefix}allmenu` }, 
+                                        { title: "🎨 ʟᴏɢᴏ ᴍᴇɴᴜ", description: "get your own logo texts", id: `${prefix}logomenu` }, 
+                                        { title: "🟢 ᴀʟɪᴠᴇ", description: "Check if bot is active", id: `${prefix}alive` }, 
+                                        { title: "♻️ ᴀᴜᴛᴏʙɪᴏ", description: "set your bio on and off", id: `${prefix}autobio` },
+                                        { title: "🪀 ᴀᴜᴛᴏʀᴇᴄᴏʀᴅɪɴɢ", description: "set recording on/off", id: `${prefix}autorecording` },    
+                                        { title: "🌟 ᴏᴡɴᴇʀ", description: "get in touch with dev", id: `${prefix}owner` },
+                                        { title: "🎭 ʜᴀᴄᴋ", description: "prank others", id: `${prefix}hack` },
+                                        { title: "🗣️ ᴄᴀʟᴄᴜʟᴀᴛᴏʀ", description: "do your own math", id: `${prefix}calculator` },
+                                        { title: "📊 ʙᴏᴛ sᴛᴀᴛs", description: "View bot statistics", id: `${prefix}session` },
+                                        { title: "ℹ️ ʙᴏᴛ ɪɴғᴏ", description: "Get bot information", id: `${prefix}active` },
+                                        { title: "🔰 sᴇᴛᴘᴘ", description: "set your own profile", id: `${prefix}setpp` },
+                                        { title: "📋 ᴍᴇɴᴜ", description: "Show this menu", id: `${prefix}menu` },
+                                        { title: "📜 ϙᴜʀᴀɴ", description: "List quran by number", id: `${prefix}quran` },
+                                        { title: "🔮 sᴄʀᴇᴇɴsʜᴏᴏᴛ", description: "get website screenshots", id: `${prefix}ss` },
+                                        { title: "💌 ғᴇᴛᴄʜ", description: "get url content", id: `${prefix}get` },  
+                                        { title: "🏓 ᴘɪɴɢ", description: "Check bot response speed", id: `${prefix}ping` },
+                                        { title: "📜 ᴘᴅғ", description: "change text to pdf", id: `${prefix}pdf` },
+                                        { title: "🔗 ᴘᴀɪʀ", description: "Generate pairing code", id: `${prefix}pair` },
+                                        { title: "✨ ғᴀɴᴄʏ", description: "Fancy text generator", id: `${prefix}fancy` },
+                                        { title: "🔮 ᴛᴛs", description: "voice converter", id: `${prefix}tts` },
+                                        { title: "🎉 ɪᴍᴀɢᴇ", description: "random image generator", id: `${prefix}img` },
+                                        { title: "🎨 ʟᴏɢᴏ", description: "Create custom logos", id: `${prefix}logo` },
+                                        { title: "❇️ ᴠᴄғ", description: "Create group contacts", id: `${prefix}vcf` },
+                                        { title: "🔮 ʀᴇᴘᴏ", description: "Main bot Repository", id: `${prefix}repo` }
+                                    ]
+                                },
+                                {
+                                    title: "🎵 ᴍᴇᴅɪᴀ ᴛᴏᴏʟs",
+                                    highlight_label: 'New',
+                                    rows: [
+                                        { title: "🎵 sᴏɴɢ", description: "Download music from YouTube", id: `${prefix}song` }, 
+                                        { title: "🎀 ᴘʟᴀʏ", description: "play favourite songs", id: `${prefix}play` },
+                                        { title: "📱 ᴛɪᴋᴛᴏᴋ", description: "Download TikTok videos", id: `${prefix}tiktok` },
+                                        { title: "💠 ᴊɪᴅ", description: "get your own jid", id: `${prefix}jid` },
+                                        { title: "📘 ғᴀᴄᴇʙᴏᴏᴋ", description: "Download Facebook content", id: `${prefix}fb` },
+                                        { title: "🎀 ʙɪʙʟᴇ", description: "get bible verses", id: `${prefix}bible` },
+                                        { title: "📸 ɪɴsᴛᴀɢʀᴀᴍ", description: "Download Instagram content", id: `${prefix}ig` },
+                                        { title: "🖼️ ᴀɪ ɪᴍɢ", description: "Generate AI images", id: `${prefix}aiimg` },
+                                        { title: "👀 ᴠɪᴇᴡᴏɴᴄᴇ", description: "Access view-once media", id: `${prefix}viewonce` },
+                                        { title: "🗣️ ᴛᴛs", description: "Text to speech", id: `${prefix}tts` },
+                                        { title: "🎬 ᴛs", description: "Terabox downloader", id: `${prefix}ts` },
+                                        { title: "🖼️ sᴛɪᴄᴋᴇʀ", description: "Convert to sticker", id: `${prefix}sticker` }
+                                    ]
+                                },
+                                {
+                                    title: "🫂 ɢʀᴏᴜᴘ sᴇᴛᴛɪɴɢs",
+                                    highlight_label: 'Popular',
+                                    rows: [
+                                        { title: "➕ ᴀᴅᴅ", description: "Add Numbers to Group", id: `${prefix}add` },
+                                        { title: "🦶 ᴋɪᴄᴋ", description: "Remove Number from Group", id: `${prefix}kick` },
+                                        { title: "🔓 ᴏᴘᴇɴ", description: "Open Group", id: `${prefix}open` },
+                                        { title: "🔒 ᴄʟᴏsᴇ", description: "Close Group", id: `${prefix}close` },
+                                        { title: "👑 ᴘʀᴏᴍᴏᴛᴇ", description: "Promote to Admin", id: `${prefix}promote` },
+                                        { title: "😢 ᴅᴇᴍᴏᴛᴇ", description: "Demote from Admin", id: `${prefix}demote` },
+                                        { title: "👥 ᴛᴀɢᴀʟʟ", description: "Tag All Members", id: `${prefix}tagall` },
+                                        { title: "👤 ᴊᴏɪɴ", description: "Join A Group", id: `${prefix}join` }
+                                    ]
+                                },
+                                {
+                                    title: "📰 ɴᴇᴡs & ɪɴғᴏ",
+                                    rows: [
+                                        { title: "📰 ɴᴇᴡs", description: "Get latest news", id: `${prefix}news` },
+                                        { title: "🚀 ɴᴀsᴀ", description: "NASA space updates", id: `${prefix}nasa` },
+                                        { title: "💬 ɢᴏssɪᴘ", description: "Entertainment gossip", id: `${prefix}gossip` },
+                                        { title: "🏏 ᴄʀɪᴄᴋᴇᴛ", description: "Cricket scores", id: `${prefix}cricket` }
+                                    ]
+                                },
+                                {
+                                    title: "🖤 ʀᴏᴍᴀɴᴛɪᴄ & ғᴜɴ",
+                                    highlight_label: 'Fun',
+                                    rows: [
+                                        { title: "😂 ᴊᴏᴋᴇ", description: "Hear a joke", id: `${prefix}joke` },
+                                        { title: "🌚 ᴅᴀʀᴋ ᴊᴏᴋᴇ", description: "Dark humor joke", id: `${prefix}darkjoke` },
+                                        { title: "🏏 ᴡᴀɪғᴜ", description: "Random anime waifu", id: `${prefix}waifu` },
+                                        { title: "😂 ᴍᴇᴍᴇ", description: "Random meme", id: `${prefix}meme` },
+                                        { title: "🐈 ᴄᴀᴛ", description: "Cute cat picture", id: `${prefix}cat` },
+                                        { title: "🐕 ᴅᴏɢ", description: "Cute dog picture", id: `${prefix}dog` },
+                                        { title: "💡 ғᴀᴄᴛ", description: "Random fact", id: `${prefix}fact` },
+                                        { title: "💘 ᴘɪᴄᴋᴜᴘ ʟɪɴᴇ", description: "Cheesy pickup line", id: `${prefix}pickupline` },
+                                        { title: "🔥 ʀᴏᴀsᴛ", description: "Savage roast", id: `${prefix}roast` },
+                                        { title: "❤️ ʟᴏᴠᴇ ϙᴜᴏᴛᴇ", description: "Romantic quote", id: `${prefix}lovequote` },
+                                        { title: "💭 ϙᴜᴏᴛᴇ", description: "Bold quote", id: `${prefix}quote` }
+                                    ]
+                                },
+                                {
+                                    title: "🔧 ᴛᴏᴏʟs & ᴜᴛɪʟɪᴛɪᴇs",
+                                    rows: [
+                                        { title: "🤖 ᴀɪ", description: "Chat with AI", id: `${prefix}ai` },
+                                        { title: "🚫 ʙʟᴏᴄᴋ", description: "block user", id: `${prefix}block` },
+                                        { title: "📊 ᴡɪɴғᴏ", description: "WhatsApp user info", id: `${prefix}winfo` },
+                                        { title: "🎀 ᴡᴀʟʟᴘᴀᴘᴇʀ", description: "cool wallpapers", id: `${prefix}wallpaper` },
+                                        { title: "🔍 ᴡʜᴏɪs", description: "Domain details", id: `${prefix}whois` },
+                                        { title: "💣 ʙᴏᴍʙ", description: "Send multiple messages", id: `${prefix}bomb` },
+                                        { title: "🖼️ ɢᴇᴛᴘᴘ", description: "Fetch profile picture", id: `${prefix}getpp` },
+                                        { title: "💾 sᴀᴠᴇsᴛᴀᴛᴜs", description: "Download status", id: `${prefix}savestatus` },
+                                        { title: "🌦️ ᴡᴇᴀᴛʜᴇʀ", description: "Weather forecast", id: `${prefix}weather` },
+                                        { title: "🎌 ᴛᴀɢᴀᴅᴍɪɴs", description: "tag admins", id: `${prefix}tagadmins` },
+                                        { title: "🔗 sʜᴏʀᴛᴜʀʟ", description: "Shorten URL", id: `${prefix}shorturl` },
+                                        { title: "📤 ᴛᴏᴜʀʟ2", description: "Upload to link", id: `${prefix}tourl2` },
+                                        { title: "📦 ᴀᴘᴋ", description: "Download APK", id: `${prefix}apk` },   
+                                        { title: "🧾 ʟʏʀɪᴄs", description: "get lyrics", id: `${prefix}lyrics` },    
+                                        { title: "🚫 ʙʟᴏᴄᴋʟɪsᴛ", description: "blocked numbers", id: `${prefix}blocklist` },
+                                        { title: "🤗 ɢɪᴛʜᴜʙ", description: "github details", id: `${prefix}github` },
+                                        { title: "📲 ғᴄ", description: "Follow newsletter", id: `${prefix}fc` }
+                                    ]
+                                }
+                            ]
+                        })
+                    }
                 }
-              ]
-            })
-          }
+            ],
+            headerType: 1,
+            contextInfo: messageContext
+        };
+        
+        // Send the main menu
+        await socket.sendMessage(sender, menuMessage, { quoted: msg });
+        
+        // Send additional buttons using gifted-btns
+        try {
+            // Create menu text for sendButtons
+            const buttonMenuText = `*${config.botName || 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ'}*\n\n` +
+                                  `🌟 *Welcome ${msg.pushName || 'User'}!*\n\n` +
+                                  `📌 *Prefix:* ${prefix}\n` +
+                                  `⏰ *Uptime:* ${hours}h ${minutes}m ${seconds}s\n` +
+                                  `💾 *Memory:* ${usedMemory}MB/${totalMemory}MB\n\n` +
+                                  `*Click the buttons below to access resources:*`;
+            
+            await sendButtons(socket, sender, {
+                title: '🔗 QUICK LINKS',
+                text: buttonMenuText,
+                footer: `> *Powered by ${config.botName || 'CaseyRhodes Mini Bot'}*`,
+                buttons: [
+                    {
+                        name: 'cta_url',
+                        buttonParamsJson: JSON.stringify({
+                            display_text: '🎥 YouTube',
+                            url: config.social?.youtube || 'https://youtube.com/@mr_unique_hacker'
+                        })
+                    },
+                    {
+                        name: 'cta_url',
+                        buttonParamsJson: JSON.stringify({
+                            display_text: '📦 Bot Repository',
+                            url: config.social?.github || 'https://github.com/mruniquehacker'
+                        })
+                    },
+                    {
+                        name: 'cta_url',
+                        buttonParamsJson: JSON.stringify({
+                            display_text: '📢 Join Channel',
+                            url: 'https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A'
+                        })
+                    },
+                    {
+                        name: 'cta_url',
+                        buttonParamsJson: JSON.stringify({
+                            display_text: '👨‍💻 Developer',
+                            url: 'https://github.com/mruniquehacker'
+                        })
+                    }
+                ]
+            }, { quoted: msg });
+        } catch (buttonError) {
+            console.error('sendButtons error:', buttonError);
+            // Fallback: Send regular text with links
+            await socket.sendMessage(sender, {
+                text: `🔗 *QUICK LINKS*\n\n` +
+                      `🎥 YouTube: ${config.social?.youtube || 'https://youtube.com/@mr_unique_hacker'}\n` +
+                      `📦 Repository: ${config.social?.github || 'https://github.com/mruniquehacker'}\n` +
+                      `📢 Channel: https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A\n\n` +
+                      `> *Powered by ${config.botName}*`
+            }, { quoted: msg });
         }
-      
-        // REMOVED: All Menu button has been deleted from here
-      ],
-      headerType: 1,
-      contextInfo: messageContext
-    };
-    
-    // Send menu
-    await socket.sendMessage(from, menuMessage, { quoted: fakevCard });
-    await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-  } catch (error) {
-    console.error('Menu command error:', error);
-    const usedMemory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-    const totalMemory = Math.round(os.totalmem() / 1024 / 1024);
-    let fallbackMenuText = `
+        
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+        
+    } catch (error) {
+        console.error('Menu command error:', error);
+        
+        // Fallback menu without buttons
+        const startTime = socketCreationTime.get(sender) || Date.now();
+        const uptime = Math.floor((Date.now() - startTime) / 1000);
+        const hours = Math.floor(uptime / 3600);
+        const minutes = Math.floor((uptime % 3600) / 60);
+        const seconds = Math.floor(uptime % 60);
+        const usedMemory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+        const totalMemory = Math.round(os.totalmem() / 1024 / 1024);
+        
+        let fallbackMenuText = `
 *╭────〘 ᴄᴀsᴇʏʀʜᴏᴅᴇs 〙───⊷*
-*┃*  🤖 *Bot*: ᴄᴀsᴇʏʀʜᴅᴇs ᴍɪɴɪ 
-*┃*  📍 *Prefix*: ${config.PREFIX}
+*┃*  🤖 *Bot*: ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ 
+*┃*  📍 *Prefix*: ${prefix}
 *┃*  ⏰ *Uptime*: ${hours}h ${minutes}m ${seconds}s
 *┃*  💾 *Memory*: ${usedMemory}MB/${totalMemory}MB
 *╰──────────────⊷*
 
-${config.PREFIX}allmenu ᴛᴏ ᴠɪᴇᴡ ᴀʟʟ ᴄᴍᴅs 
-> *mᥲძᥱ ᑲᥡ ᴄᴀsᴇʏʀʜᴏᴅᴇs*
+${prefix}allmenu ᴛᴏ ᴠɪᴇᴡ ᴀʟʟ ᴄᴍᴅs 
+
+🔗 *Quick Links:*
+• YouTube: ${config.social?.youtube || 'https://youtube.com/@mr_unique_hacker'}
+• Repository: ${config.social?.github || 'https://github.com/mruniquehacker'}
+• Channel: https://whatsapp.com/channel/0029Va90zAnIHphOuO8Msp3A
+
+> *ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs*
 `;
 
-    await socket.sendMessage(from, {
-      image: { url: "https://i.ibb.co/fGSVG8vJ/caseyweb.jpg" },
-      caption: fallbackMenuText,
-      contextInfo: messageContext
-    }, { quoted: fakevCard });
-    await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-  }
-  break;
+        await socket.sendMessage(sender, {
+            image: { url: "https://i.ibb.co/fGSVG8vJ/caseyweb.jpg" },
+            caption: fallbackMenuText
+        }, { quoted: msg });
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
 }
 //logo menu 
 
