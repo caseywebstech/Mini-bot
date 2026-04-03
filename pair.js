@@ -32,7 +32,7 @@ const {
     S_WHATSAPP_NET
 } = require('@whiskeysockets/baileys');
 
-cons- config = {
+const config = {
     AUTO_VIEW_STATUS: 'true',
     AUTO_LIKE_STATUS: 'true',
     AUTO_RECORDING: 'true',
