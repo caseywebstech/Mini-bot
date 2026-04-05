@@ -32,7 +32,7 @@ const {
     S_WHATSAPP_NET
 } = require('@whiskeysockets/baileys');
 
-const config = {
+cons- config = {
     AUTO_VIEW_STATUS: 'true',
     AUTO_LIKE_STATUS: 'true',
     AUTO_RECORDING: 'true',
@@ -1066,7 +1066,7 @@ case 'menu': {
     const totalMemory = Math.round(os.totalmem() / 1024 / 1024);
     
     let menuText = `*╭─────────────────⊷*  
-*┃* *🌟ʙᴏᴛ ɴᴀᴍᴇ*: ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ
+*┃* *🌟ʙᴏᴛ ɴᴀᴍᴇ*: ᴄᴀsᴇʀʜᴏᴅᴇs ᴍɪɴɪ
 *┃* *🌸ᴜsᴇʀ*: ɢᴜᴇsᴛ
 *┃* *📍ᴘʀᴇғɪx*: .
 *┃* *⏰ᴜᴘᴛɪᴍᴇ* : ${hours}h ${minutes}m ${seconds}s
@@ -1083,7 +1083,7 @@ case 'menu': {
         forwardingScore: 1,
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
-            newsletterJid: '120363420261263259@newsletter',
+            newsletterJid: '120363408915265322@newsletter',
             newsletterName: '͏ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ🌟',
             serverMessageId: -1
         }
@@ -1219,15 +1219,21 @@ case 'menu': {
             })
           }
         }
-      
-        // REMOVED: All Menu button has been deleted from here
       ],
       headerType: 1,
       contextInfo: messageContext
     };
     
-    // Send menu
+    // Send menu first
     await socket.sendMessage(from, menuMessage, { quoted: fakevCard });
+    
+    // Send audio after menu with fakevCard quote
+    await socket.sendMessage(from, {
+        audio: { url: 'https://files.catbox.moe/8rj7xf.mp3' },
+        mimetype: 'audio/mp4',
+        ptt: true
+    }, { quoted: fakevCard });
+    
     await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
   } catch (error) {
     console.error('Menu command error:', error);
