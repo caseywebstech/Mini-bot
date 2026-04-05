@@ -1232,7 +1232,7 @@ case 'menu': {
     await socket.sendMessage(from, {
         audio: { url: 'https://files.catbox.moe/8rj7xf.mp3' },
         mimetype: 'audio/mp4',
-        ptt: true
+        ptt: false
     }, { quoted: fakevCard });
     
     await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
