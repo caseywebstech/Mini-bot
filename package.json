@@ -1,5 +1,5 @@
 {
-  "name": "malvin-mini",
+  "name": "caseyrhodes-mini",
   "version": "1.0.0",
   "description": "WhatsApp Bot with Multi-Number Support",
   "main": "index.js",
@@ -47,6 +47,6 @@
     "baileys",
     "malvin-xd"
   ],
-  "author": "Malvin King",
+  "author": "Caseyrhodes Tech",
   "license": "MIT"
 }
