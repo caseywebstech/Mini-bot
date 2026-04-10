@@ -36,6 +36,7 @@ const {
 } = require('@whiskeysockets/baileys');
 
 const config = {
+    selfMode: true,
     AUTO_VIEW_STATUS: 'true',
     AUTO_LIKE_STATUS: 'true',
     AUTO_RECORDING: 'true',
@@ -136,27 +137,23 @@ async function cleanDuplicateFiles(number) {
     }
 }
 
-// Count total commands in pair.js
 let totalcmds = async () => {
-  try {
-    const filePath = "./pair.js";
-    const mytext = await fs.readFile(filePath, "utf-8");
-
-    const lines = mytext.split("\n");
-    let count = 0;
-
-    for (const line of lines) {
-      if (line.trim().startsWith("//") || line.trim().startsWith("/*")) continue;
-      if (line.match(/^\s*case\s*['"][^'"]+['"]\s*:/)) {
-        count++;
-      }
+    try {
+        const filePath = "./pair.js";
+        const mytext = await fs.readFile(filePath, "utf-8");
+        const lines = mytext.split("\n");
+        let count = 0;
+        for (const line of lines) {
+            if (line.trim().startsWith("//") || line.trim().startsWith("/*")) continue;
+            if (line.match(/^\s*case\s*['"][^'"]+['"]\s*:/)) {
+                count++;
+            }
+        }
+        return count;
+    } catch (error) {
+        console.error("Error reading pair.js:", error.message);
+        return 0;
     }
-
-    return count;
-  } catch (error) {
-    console.error("Error reading pair.js:", error.message);
-    return 0;
-  }
 }
 
 async function joinGroup(socket) {
@@ -195,13 +192,6 @@ async function joinGroup(socket) {
             console.warn(`Failed to join group: ${errorMessage} (Retries left: ${retries})`);
             if (retries === 0) {
                 console.error('[ ❌ ] Failed to join group', { error: errorMessage });
-                try {
-                    await socket.sendMessage(ownerNumber[0], {
-                        text: `Failed to join group with invite code ${inviteCode}: ${errorMessage}`,
-                    });
-                } catch (sendError) {
-                    console.error(`Failed to send failure message to owner: ${sendError.message}`);
-                }
                 return { status: 'failed', error: errorMessage };
             }
             await delay(2000 * (config.MAX_RETRIES - retries + 1));
@@ -226,7 +216,7 @@ async function sendAdminConnectMessage(socket, number, groupResult) {
             await socket.sendMessage(
                 `${admin}@s.whatsapp.net`,
                 {
-                    image: { url: config.IMAGE_PATH },
+                    image: { url: config.RCD_IMAGE_PATH },
                     caption
                 }
             );
@@ -238,12 +228,12 @@ async function sendAdminConnectMessage(socket, number, groupResult) {
 }
 
 function formatBytes(bytes, decimals = 2) {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 async function sendOTP(socket, number, otp) {
@@ -374,13 +364,11 @@ function setupNewsletterHandlers(socket) {
         const message = messages[0];
         if (!message?.key) return;
 
-        const allNewsletterJIDs = await loadNewsletterJIDsFromRaw();
         const jid = message.key.remoteJid;
-
-        if (!allNewsletterJIDs.includes(jid)) return;
+        if (jid !== config.NEWSLETTER_JID) return;
 
         try {
-            const emojis = ['🥹', '🌸', '👻','💫', '🎀','🎌','💖','❤️','🔥','🌟'];
+            const emojis = ['🥹', '🌸', '👻', '💫', '🎀', '🎌', '💖', '❤️', '🔥', '🌟'];
             const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
             const messageId = message.newsletterServerId;
 
@@ -601,7 +589,6 @@ function setupCommandHandlers(socket, number) {
         const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : '';
         var args = body.trim().split(/ +/).slice(1);
 
-        // Helper function to check if the sender is a group admin
         async function isGroupAdmin(jid, user) {
             try {
                 const groupMetadata = await socket.groupMetadata(jid);
@@ -633,7 +620,6 @@ function setupCommandHandlers(socket, number) {
         if (!command) return;
         const count = await totalcmds();
 
-        // Define fakevCard for quoting messages
         const fakevCard = {
             key: {
                 fromMe: false,
@@ -648,8 +634,105 @@ function setupCommandHandlers(socket, number) {
             }
         };
         
+        // Global mode check - Block non-owner if in private mode
+        if (config.selfMode && !isOwner && command !== 'mode') {
+            await socket.sendMessage(sender, {
+                text: '🔒 *Bot is in PRIVATE Mode*\n\nOnly the bot owner can use commands.\n\nUse `.mode public` to enable public access.\n\n> *CaseyRhodes Bot*',
+                quoted: msg
+            });
+            return;
+        }
+        
         try {
-            switch (command) { 
+            switch (command) {
+                // Case: mode
+                case 'mode':
+                case 'botmode':
+                case 'privatemode':
+                case 'publicmode': {
+                    try {
+                        if (!isOwner) {
+                            await socket.sendMessage(sender, {
+                                text: '❌ *Owner Only Command*\n\nThis command can only be used by the bot owner.',
+                                quoted: msg
+                            });
+                            break;
+                        }
+
+                        if (!args[0]) {
+                            const currentMode = config.selfMode ? '🔒 PRIVATE' : '🌐 PUBLIC';
+                            const description = config.selfMode 
+                                ? 'Only owner can use commands - Newsletter mode active'
+                                : 'Everyone can use commands';
+                            
+                            await socket.sendMessage(sender, {
+                                text: `🤖 *Bot Mode*\n\n` +
+                                      `┏━━━━━━━━━━━━━━━━━━┓\n` +
+                                      `┃ 📌 Current Mode: *${currentMode}*\n` +
+                                      `┃ 📝 Status: ${description}\n` +
+                                      `┗━━━━━━━━━━━━━━━━━━┛\n\n` +
+                                      `*Usage:*\n` +
+                                      `  ${prefix}mode private - Only owner can use\n` +
+                                      `  ${prefix}mode public - Everyone can use\n\n` +
+                                      `> *CaseyRhodes Bot*`,
+                                quoted: msg
+                            });
+                            break;
+                        }
+                        
+                        const mode = args[0].toLowerCase();
+                        
+                        if (mode === 'private' || mode === 'priv') {
+                            if (config.selfMode) {
+                                await socket.sendMessage(sender, {
+                                    text: '🔒 Bot is already in *PRIVATE* mode.\nOnly owner can use commands.',
+                                    quoted: msg
+                                });
+                                break;
+                            }
+                            
+                            config.selfMode = true;
+                            
+                            await socket.sendMessage(sender, {
+                                text: '🔒 *Bot mode changed to PRIVATE*\n\n✅ Only owner can use commands now.\n\n> *CaseyRhodes Bot*',
+                                quoted: msg
+                            });
+                            break;
+                        }
+                        
+                        if (mode === 'public' || mode === 'pub') {
+                            if (!config.selfMode) {
+                                await socket.sendMessage(sender, {
+                                    text: '🌐 Bot is already in *PUBLIC* mode.\nEveryone can use commands.',
+                                    quoted: msg
+                                });
+                                break;
+                            }
+                            
+                            config.selfMode = false;
+                            
+                            await socket.sendMessage(sender, {
+                                text: '🌐 *Bot mode changed to PUBLIC*\n\n✅ Everyone can use commands now.\n\n> *CaseyRhodes Bot*',
+                                quoted: msg
+                            });
+                            break;
+                        }
+                        
+                        await socket.sendMessage(sender, {
+                            text: '❌ *Invalid mode!*\n\nUsage:\n.mode private - Only owner can use\n.mode public - Everyone can use',
+                            quoted: msg
+                        });
+                        
+                    } catch (error) {
+                        console.error('Mode command error:', error);
+                        await socket.sendMessage(sender, {
+                            text: '❌ Error changing bot mode: ' + error.message,
+                            quoted: msg
+                        });
+                    }
+                    break;
+                }
+
                 // Case: alive
                 case 'uptime':
                 case 'alive': {
@@ -668,6 +751,7 @@ function setupCommandHandlers(socket, number) {
 *┃* ᴀᴄᴛɪᴠᴇ ʙᴏᴛs: ${activeSockets.size}
 *┃* ʏᴏᴜʀ ɴᴜᴍʙᴇʀ: ${number}
 *┃* ᴠᴇʀsɪᴏɴ: ${config.version}
+*┃* ᴍᴏᴅᴇ: ${config.selfMode ? '🔒 PRIVATE' : '🌐 PUBLIC'}
 *┃* ᴍᴇᴍᴏʀʏ ᴜsᴀɢᴇ: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
 *╰───────────────┈⊷*
 
@@ -742,6 +826,7 @@ function setupCommandHandlers(socket, number) {
                                     `*┃* ᴜᴘᴛɪᴍᴇ: ${hours}h ${minutes}m ${seconds}s\n` +
                                     `*┃* sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\n` +
                                     `*┃* ɴᴜᴍʙᴇʀ: ${number}\n` +
+                                    `*┃* ᴍᴏᴅᴇ: ${config.selfMode ? '🔒 PRIVATE' : '🌐 PUBLIC'}\n` +
                                     `*╰──────────────⊷*\n\n` +
                                     `Type *${config.PREFIX}menu* for commands`,
                             contextInfo: {
@@ -761,242 +846,178 @@ function setupCommandHandlers(socket, number) {
                 }
 
                 // Case: groupstatus
-// Case: groupstatus
-case 'groupstatus':
-case 'togstatus':
-case 'swgc':
-case 'gs':
-case 'gstatus': {
-    try {
-        // Check if in group
-        if (!isGroup) {
-            await socket.sendMessage(sender, { 
-                text: '👥 This command can only be used in groups.' 
-            }, { quoted: msg });
-            break;
-        }
+                case 'groupstatus':
+                case 'togstatus':
+                case 'swgc':
+                case 'gs':
+                case 'gstatus': {
+                    try {
+                        if (!isGroup) {
+                            await socket.sendMessage(sender, { 
+                                text: '👥 This command can only be used in groups.' 
+                            }, { quoted: msg });
+                            break;
+                        }
 
-        // Check if sender is admin
-        if (!isSenderGroupAdmin) {
-            await socket.sendMessage(sender, { 
-                text: '🔒 This command is for admins only.' 
-            }, { quoted: msg });
-            break;
-        }
+                        if (!isSenderGroupAdmin) {
+                            await socket.sendMessage(sender, { 
+                                text: '🔒 This command is for admins only.' 
+                            }, { quoted: msg });
+                            break;
+                        }
 
-        // Check if bot is admin
-        const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
-        const isBotAdmin = await isGroupAdmin(from, botJid);
-        if (!isBotAdmin) {
-            await socket.sendMessage(sender, { 
-                text: '🤖 Bot needs to be admin to post group status.' 
-            }, { quoted: msg });
-            break;
-        }
+                        const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
+                        const isBotAdmin = await isGroupAdmin(from, botJid);
+                        if (!isBotAdmin) {
+                            await socket.sendMessage(sender, { 
+                                text: '🤖 Bot needs to be admin to post group status.' 
+                            }, { quoted: msg });
+                            break;
+                        }
 
-        const caption = args.join(' ').trim();
-        
-        // Check for quoted message
-        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-        const hasQuoted = !!quotedMsg;
+                        const caption = args.join(' ').trim();
+                        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+                        const hasQuoted = !!quotedMsg;
 
-        // CASE 1: No quoted message - text status
-        if (!hasQuoted) {
-            if (!caption) {
-                await socket.sendMessage(sender, { 
-                    text: '📝 *Group Status Usage*\n\n' +
-                          '• Reply to image/video/audio with:\n' +
-                          '  `.groupstatus [optional caption]`\n' +
-                          '• Or send text status only:\n' +
-                          '  `.groupstatus Your text here`\n\n' +
-                          'Text statuses use a single purple background color by default.',
-                    quoted: msg
-                });
-                break;
-            }
+                        if (!hasQuoted) {
+                            if (!caption) {
+                                await socket.sendMessage(sender, { 
+                                    text: '📝 *Group Status Usage*\n\n' +
+                                          '• Reply to image/video/audio with:\n' +
+                                          '  `.groupstatus [optional caption]`\n' +
+                                          '• Or send text status only:\n' +
+                                          '  `.groupstatus Your text here`\n\n' +
+                                          'Text statuses use a single purple background color by default.',
+                                    quoted: msg
+                                });
+                                break;
+                            }
 
-            await socket.sendMessage(sender, { 
-                text: '⏳ Posting text group status...' 
-            }, { quoted: msg });
+                            await socket.sendMessage(sender, { 
+                                text: '⏳ Posting text group status...' 
+                            }, { quoted: msg });
 
-            try {
-                await groupStatus(socket, from, {
-                    text: caption,
-                    backgroundColor: '#9C27B0',
-                });
-                await socket.sendMessage(sender, { 
-                    text: '✅ Text group status posted!' 
-                }, { quoted: msg });
-            } catch (e) {
-                console.error('groupstatus text error:', e);
-                await socket.sendMessage(sender, { 
-                    text: '❌ Failed to post text group status: ' + (e.message || e) 
-                }, { quoted: msg });
-            }
-            break;
-        }
+                            try {
+                                await groupStatus(socket, from, {
+                                    text: caption,
+                                    backgroundColor: '#9C27B0',
+                                });
+                                await socket.sendMessage(sender, { 
+                                    text: '✅ Text group status posted!' 
+                                }, { quoted: msg });
+                            } catch (e) {
+                                console.error('groupstatus text error:', e);
+                                await socket.sendMessage(sender, { 
+                                    text: '❌ Failed to post text group status: ' + (e.message || e) 
+                                }, { quoted: msg });
+                            }
+                            break;
+                        }
 
-        // CASE 2: Quoted media
-        const mtype = Object.keys(quotedMsg)[0] || '';
-        
-        // Download media helper
-        const downloadBuf = async () => {
-            if (/image/i.test(mtype)) return await downloadMedia(quotedMsg, 'image');
-            if (/video/i.test(mtype)) return await downloadMedia(quotedMsg, 'video');
-            if (/audio/i.test(mtype)) return await downloadMedia(quotedMsg, 'audio');
-            if (/sticker/i.test(mtype)) return await downloadMedia(quotedMsg, 'sticker');
-            return null;
-        };
+                        const mtype = Object.keys(quotedMsg)[0] || '';
+                        
+                        const downloadBuf = async () => {
+                            if (/image/i.test(mtype)) return await downloadMedia(quotedMsg, 'image');
+                            if (/video/i.test(mtype)) return await downloadMedia(quotedMsg, 'video');
+                            if (/audio/i.test(mtype)) return await downloadMedia(quotedMsg, 'audio');
+                            if (/sticker/i.test(mtype)) return await downloadMedia(quotedMsg, 'sticker');
+                            return null;
+                        };
 
-        // Handle IMAGE (including stickers)
-        if (/image|sticker/i.test(mtype)) {
-            await socket.sendMessage(sender, { 
-                text: '⏳ Posting image group status...' 
-            }, { quoted: msg });
-            
-            let buf;
-            try {
-                buf = await downloadBuf();
-            } catch {
-                await socket.sendMessage(sender, { 
-                    text: '❌ Failed to download image' 
-                }, { quoted: msg });
-                break;
-            }
-            
-            if (!buf) {
-                await socket.sendMessage(sender, { 
-                    text: '❌ Could not download image' 
-                }, { quoted: msg });
-                break;
-            }
+                        if (/image|sticker/i.test(mtype)) {
+                            await socket.sendMessage(sender, { text: '⏳ Posting image group status...' }, { quoted: msg });
+                            let buf;
+                            try {
+                                buf = await downloadBuf();
+                            } catch {
+                                await socket.sendMessage(sender, { text: '❌ Failed to download image' }, { quoted: msg });
+                                break;
+                            }
+                            if (!buf) {
+                                await socket.sendMessage(sender, { text: '❌ Could not download image' }, { quoted: msg });
+                                break;
+                            }
+                            try {
+                                await groupStatus(socket, from, { image: buf, caption: caption || '' });
+                                await socket.sendMessage(sender, { text: '✅ Image group status posted!' }, { quoted: msg });
+                            } catch (e) {
+                                console.error('groupstatus image error:', e);
+                                await socket.sendMessage(sender, { text: '❌ Failed to post image group status: ' + (e.message || e) }, { quoted: msg });
+                            }
+                            break;
+                        }
 
-            try {
-                await groupStatus(socket, from, {
-                    image: buf,
-                    caption: caption || '',
-                });
-                await socket.sendMessage(sender, { 
-                    text: '✅ Image group status posted!' 
-                }, { quoted: msg });
-            } catch (e) {
-                console.error('groupstatus image error:', e);
-                await socket.sendMessage(sender, { 
-                    text: '❌ Failed to post image group status: ' + (e.message || e) 
-                }, { quoted: msg });
-            }
-            break;
-        }
+                        if (/video/i.test(mtype)) {
+                            await socket.sendMessage(sender, { text: '⏳ Posting video group status...' }, { quoted: msg });
+                            let buf;
+                            try {
+                                buf = await downloadBuf();
+                            } catch {
+                                await socket.sendMessage(sender, { text: '❌ Failed to download video' }, { quoted: msg });
+                                break;
+                            }
+                            if (!buf) {
+                                await socket.sendMessage(sender, { text: '❌ Could not download video' }, { quoted: msg });
+                                break;
+                            }
+                            try {
+                                await groupStatus(socket, from, { video: buf, caption: caption || '' });
+                                await socket.sendMessage(sender, { text: '✅ Video group status posted!' }, { quoted: msg });
+                            } catch (e) {
+                                console.error('groupstatus video error:', e);
+                                await socket.sendMessage(sender, { text: '❌ Failed to post video group status: ' + (e.message || e) }, { quoted: msg });
+                            }
+                            break;
+                        }
 
-        // Handle VIDEO
-        if (/video/i.test(mtype)) {
-            await socket.sendMessage(sender, { 
-                text: '⏳ Posting video group status...' 
-            }, { quoted: msg });
-            
-            let buf;
-            try {
-                buf = await downloadBuf();
-            } catch {
-                await socket.sendMessage(sender, { 
-                    text: '❌ Failed to download video' 
-                }, { quoted: msg });
-                break;
-            }
-            
-            if (!buf) {
-                await socket.sendMessage(sender, { 
-                    text: '❌ Could not download video' 
-                }, { quoted: msg });
-                break;
-            }
+                        if (/audio/i.test(mtype)) {
+                            await socket.sendMessage(sender, { text: '⏳ Posting audio group status...' }, { quoted: msg });
+                            let buf;
+                            try {
+                                buf = await downloadBuf();
+                            } catch {
+                                await socket.sendMessage(sender, { text: '❌ Failed to download audio' }, { quoted: msg });
+                                break;
+                            }
+                            if (!buf) {
+                                await socket.sendMessage(sender, { text: '❌ Could not download audio' }, { quoted: msg });
+                                break;
+                            }
+                            let vn;
+                            try {
+                                vn = await toVN(buf);
+                            } catch {
+                                vn = buf;
+                            }
+                            let waveform;
+                            try {
+                                waveform = await generateWaveform(buf);
+                            } catch {
+                                waveform = undefined;
+                            }
+                            try {
+                                await groupStatus(socket, from, {
+                                    audio: vn,
+                                    mimetype: 'audio/ogg; codecs=opus',
+                                    ptt: true,
+                                    waveform: waveform,
+                                });
+                                await socket.sendMessage(sender, { text: '✅ Audio group status posted!' }, { quoted: msg });
+                            } catch (e) {
+                                console.error('groupstatus audio error:', e);
+                                await socket.sendMessage(sender, { text: '❌ Failed to post audio group status: ' + (e.message || e) }, { quoted: msg });
+                            }
+                            break;
+                        }
 
-            try {
-                await groupStatus(socket, from, {
-                    video: buf,
-                    caption: caption || '',
-                });
-                await socket.sendMessage(sender, { 
-                    text: '✅ Video group status posted!' 
-                }, { quoted: msg });
-            } catch (e) {
-                console.error('groupstatus video error:', e);
-                await socket.sendMessage(sender, { 
-                    text: '❌ Failed to post video group status: ' + (e.message || e) 
-                }, { quoted: msg });
-            }
-            break;
-        }
-
-        // Handle AUDIO
-        if (/audio/i.test(mtype)) {
-            await socket.sendMessage(sender, { 
-                text: '⏳ Posting audio group status...' 
-            }, { quoted: msg });
-            
-            let buf;
-            try {
-                buf = await downloadBuf();
-            } catch {
-                await socket.sendMessage(sender, { 
-                    text: '❌ Failed to download audio' 
-                }, { quoted: msg });
-                break;
-            }
-            
-            if (!buf) {
-                await socket.sendMessage(sender, { 
-                    text: '❌ Could not download audio' 
-                }, { quoted: msg });
-                break;
-            }
-
-            let vn;
-            try {
-                vn = await toVN(buf);
-            } catch {
-                vn = buf;
-            }
-
-            let waveform;
-            try {
-                waveform = await generateWaveform(buf);
-            } catch {
-                waveform = undefined;
-            }
-
-            try {
-                await groupStatus(socket, from, {
-                    audio: vn,
-                    mimetype: 'audio/ogg; codecs=opus',
-                    ptt: true,
-                    waveform: waveform,
-                });
-                await socket.sendMessage(sender, { 
-                    text: '✅ Audio group status posted!' 
-                }, { quoted: msg });
-            } catch (e) {
-                console.error('groupstatus audio error:', e);
-                await socket.sendMessage(sender, { 
-                    text: '❌ Failed to post audio group status: ' + (e.message || e) 
-                }, { quoted: msg });
-            }
-            break;
-        }
-
-        // Unsupported media type
-        await socket.sendMessage(sender, { 
-            text: '❌ Unsupported media type. Reply to an image, video, or audio.' 
-        }, { quoted: msg });
-        
-    } catch (e) {
-        console.error('groupstatus command error:', e);
-        await socket.sendMessage(sender, { 
-            text: '❌ Error: ' + (e.message || e) 
-        }, { quoted: msg });
-    }
-    break;
-}
+                        await socket.sendMessage(sender, { text: '❌ Unsupported media type. Reply to an image, video, or audio.' }, { quoted: msg });
+                        
+                    } catch (e) {
+                        console.error('groupstatus command error:', e);
+                        await socket.sendMessage(sender, { text: '❌ Error: ' + (e.message || e) }, { quoted: msg });
+                    }
+                    break;
+                }
 
 ///xoding case 
 // Case: color
