@@ -8955,62 +8955,81 @@ case 'climate': {
       //case repository 
       //case repository 
 // Case: repo - Show repository information
+// Case: github - Show GitHub repository info
+case 'github':
 case 'repo':
-case 'repository':
-case 'github': {
+case 'git':
+case 'source':
+case 'sc':
+case 'script': {
     try {
-        const repoText = `*📦 CASEYRHODES BOT REPOSITORY*\n\n` +
-                         `┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n` +
-                         `┃ 📌 *Bot Name:* ${config.OWNER_NAME}\n` +
-                         `┃ 🔢 *Version:* ${config.version}\n` +
-                         `┃ 👨‍💻 *Owner:* CaseyRhodes\n` +
-                         `┃ 📱 *WhatsApp:* wa.me/${config.OWNER_NUMBER}\n` +
-                         `┃ 📺 *YouTube:* @caseyrhodes\n` +
-                         `┃ 💻 *GitHub:* github.com/caseyweb\n` +
-                         `┗━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n` +
-                         `*📝 Description:*\n` +
-                         `Multi-device WhatsApp bot with advanced features including group management, sticker tools, media downloader, AI chat, and much more!\n\n` +
-                         `*⭐ Features:*\n` +
-                         `• 🎨 Sticker Creator & Stealer\n` +
-                         `• 📊 Group Management\n` +
-                         `• 🎵 Music Downloader\n` +
-                         `• 🤖 AI Chat Assistant\n` +
-                         `• 📰 News Updates\n` +
-                         `• 🔒 Anti-Call System\n` +
-                         `• 👑 Owner Controls\n\n` +
-                         `> *${config.BOT_FOOTER}*`;
-
+        // Send reaction
+        await socket.sendMessage(sender, { react: { text: '📦', key: msg.key } });
+        
+        const repoUrl = 'https://github.com/mruniquehacker/KnightBot-Mini';
+        const apiUrl = 'https://api.github.com/repos/mruniquehacker/KnightBot-Mini';
+        
+        let message = '';
+        
+        try {
+            // Fetch repository data from GitHub API
+            const response = await axios.get(apiUrl, {
+                headers: { 'User-Agent': 'KnightBot-Mini' },
+                timeout: 5000
+            });
+            
+            const repo = response.data;
+            
+            // Format message with stats
+            message = `╭━━『 *📦 GITHUB REPO* 』━━╮\n\n` +
+                      `🤖 *Bot:* ${config.OWNER_NAME}\n` +
+                      `📁 *Repo:* ${repo.name}\n` +
+                      `👤 *Owner:* ${repo.owner.login}\n` +
+                      `⭐ *Stars:* ${repo.stargazers_count.toLocaleString()}\n` +
+                      `🍴 *Forks:* ${repo.forks_count.toLocaleString()}\n` +
+                      `📝 *Desc:* ${repo.description || 'WhatsApp Bot'}\n\n` +
+                      `🔗 *Link:* ${repo.html_url}\n\n` +
+                      `╰━━━━━━━━━━━━━━━╯\n\n` +
+                      `> *${config.BOT_FOOTER}*`;
+            
+        } catch (apiError) {
+            // Fallback message if API fails
+            message = `╭━━『 *📦 GITHUB REPO* 』━━╮\n\n` +
+                      `🤖 *Bot:* ${config.OWNER_NAME}\n` +
+                      `📁 *Repo:* KnightBot-Mini\n` +
+                      `👤 *Owner:* mruniquehacker\n` +
+                      `🔗 *URL:* ${repoUrl}\n\n` +
+                      `⚠️ *Stats unavailable*\n` +
+                      `Visit repo for latest stats\n\n` +
+                      `╰━━━━━━━━━━━━━━━╯\n\n` +
+                      `> *${config.BOT_FOOTER}*`;
+        }
+        
+        // Send message with buttons
         await socket.sendMessage(sender, {
-            text: repoText,
+            text: message,
             buttons: [
                 {
                     name: 'cta_url',
                     buttonParamsJson: JSON.stringify({
-                        display_text: 'YouTube',
-                        url: 'https://youtube.com/@caseyrhodes'
+                        display_text: '⭐ STAR REPO',
+                        url: `${repoUrl}/stargazers`
                     })
                 },
                 {
                     name: 'cta_url',
                     buttonParamsJson: JSON.stringify({
-                        display_text: 'Visit Bot Repo',
-                        url: 'https://github.com/caseyweb'
-                    })
-                },
-                {
-                    name: 'cta_url',
-                    buttonParamsJson: JSON.stringify({
-                        display_text: 'Join Channel',
-                        url: config.CHANNEL_LINK
+                        display_text: '🔗 VISIT REPO',
+                        url: repoUrl
                     })
                 }
             ]
         }, { quoted: msg });
         
     } catch (error) {
-        console.error('Repo command error:', error);
+        console.error('GitHub command error:', error);
         await socket.sendMessage(sender, {
-            text: '❌ Failed to load repository information.',
+            text: '❌ Failed to fetch repository info.',
             quoted: msg
         });
     }
