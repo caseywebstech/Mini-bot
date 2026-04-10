@@ -18,6 +18,7 @@ const os = require('os');
 const { tmpdir } = require('os');
 const { sms, downloadMediaMessage } = require("./msg");
 const { PassThrough } = require('stream');
+const webp = require('node-webpmux');
 const ffmpeg = require('fluent-ffmpeg');
 const {
     default: makeWASocket,
@@ -1357,17 +1358,19 @@ case 'deb64': {
     break;
 }
 // Take Command - Case Command Format (Steal a sticker and re-pack)
+// Add this case inside your switch(command) { statement
+
+// Case: take - Steal sticker and repack
 case 'take':
 case 'steal': {
     try {
-        // Get the quoted message
         let targetMessage = msg;
         const ctxInfo = msg.message?.extendedTextMessage?.contextInfo;
         
         if (ctxInfo?.quotedMessage) {
             targetMessage = {
                 key: { 
-                    remoteJid: sender, 
+                    remoteJid: from, 
                     id: ctxInfo.stanzaId, 
                     participant: ctxInfo.participant 
                 },
@@ -1378,109 +1381,62 @@ case 'steal': {
         const stickerMsg = targetMessage.message?.stickerMessage;
         
         if (!stickerMsg) {
-            await socket.sendMessage(sender, { 
-                text: '🎭 *Ｒᴇᴘʟʏ ᴛᴏ ᴀ sᴛɪᴄᴋᴇʀ* ᴡɪᴛʜ `.take` ᴛᴏ sᴛᴇᴀʟ ɪᴛ.' 
-            }, { quoted: msg });
+            await socket.sendMessage(sender, {
+                text: `🎭 *Steal Sticker*\n\n┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n┃ 📌 *How to use:*\n┃\n┃ 1️⃣ Reply to a sticker\n┃ 2️⃣ Type: ${prefix}take [packname]\n┃\n┃ *Example:*\n┃ ${prefix}take CaseyBot\n┗━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n> *CaseyRhodes Bot*`,
+                quoted: msg
+            });
             break;
         }
         
-        try {
-            // Download the sticker
-            const mediaBuffer = await downloadMediaMessage(
-                targetMessage,
-                'buffer',
-                {},
-                { logger: undefined, reuploadRequest: socket.updateMediaMessage },
-            );
-            
-            if (!mediaBuffer) {
-                await socket.sendMessage(sender, { 
-                    text: '❌ *Fᴀɪʟᴇᴅ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ sᴛɪᴄᴋᴇʀ.* Pʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ.' 
-                }, { quoted: msg });
-                break;
-            }
-            
-            // Get user name or custom packname
-            const userName = msg.pushName || sender.split('@')[0];
-            const packname = args.length ? args.join(' ') : userName;
-            
-            // Process the sticker
-            const img = new webp.Image();
-            await img.load(mediaBuffer);
-            
-            const json = {
-                'sticker-pack-id': crypto.randomBytes(32).toString('hex'),
-                'sticker-pack-name': packname,
-                'sticker-pack-publisher': config.botName || 'CaseyRhodes Mini Bot',
-                emojis: ['🎭', '🤖', '✨'],
-            };
-            
-            const exifAttr = Buffer.from([
-                0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00,
-                0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00,
-                0x00, 0x00, 0x16, 0x00, 0x00, 0x00,
-            ]);
-            
-            const jsonBuffer = Buffer.from(JSON.stringify(json), 'utf8');
-            const exif = Buffer.concat([exifAttr, jsonBuffer]);
-            exif.writeUIntLE(jsonBuffer.length, 14, 4);
-            
-            img.exif = exif;
-            const finalBuffer = await img.save(null);
-            
-            // Send the stolen sticker
-            await socket.sendMessage(sender, { 
-                sticker: finalBuffer 
-            }, { quoted: msg });
-            
-            // Optional: Send success message with buttons
-            const successMessage = {
-                text: `✅ *Sᴛɪᴄᴋᴇʀ Sᴛᴏʟᴇɴ Sᴜᴄᴄᴇssғᴜʟʟʏ!*\n\n` +
-                      `📦 *Pᴀᴄᴋɴᴀᴍᴇ:* ${packname}\n` +
-                      `👤 *Sᴛᴏʟᴇɴ ʙʏ:* ${userName}\n` +
-                      `🎭 *Eᴍᴏᴊɪ:* 🤖\n\n` +
-                      `> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ${config.botName || 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ'}*`,
-                footer: `🎭 Sᴛɪᴄᴋᴇʀ Sᴛᴇᴀʟᴇʀ 🎭`,
-                buttons: [
-                    {
-                        buttonId: `${prefix}sticker`,
-                        buttonText: { 
-                            displayText: '🎨 𝐌𝐚𝐤𝐞 𝐒𝐭𝐢𝐜𝐤𝐞𝐫' 
-                        },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${prefix}take`,
-                        buttonText: { 
-                            displayText: '🔄 𝐒𝐭𝐞𝐚𝐥 𝐀𝐧𝐨𝐭𝐡𝐞𝐫' 
-                        },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${prefix}packinfo`,
-                        buttonText: { 
-                            displayText: '📦 𝐏𝐚𝐜𝐤 𝐈𝐧𝐟𝐨' 
-                        },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            };
-            
-            await socket.sendMessage(sender, successMessage, { quoted: msg });
-            
-        } catch (error) {
-            console.error('Take command error:', error);
-            await socket.sendMessage(sender, { 
-                text: '❌ *Fᴀɪʟᴇᴅ ᴛᴏ sᴛᴇᴀʟ sᴛɪᴄᴋᴇʀ.* Pʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ.' 
-            }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '🎭', key: msg.key } });
+        
+        const mediaBuffer = await downloadMediaMessage(
+            targetMessage,
+            'buffer',
+            {},
+            { logger: undefined, reuploadRequest: socket.updateMediaMessage }
+        );
+        
+        if (!mediaBuffer) {
+            await socket.sendMessage(sender, { text: '❌ Failed to download sticker. Please try again.' }, { quoted: msg });
+            break;
         }
         
+        const userName = msg.pushName || senderNumber;
+        const packname = args.length ? args.join(' ') : userName;
+        
+        const img = new webp.Image();
+        await img.load(mediaBuffer);
+        
+        const json = {
+            'sticker-pack-id': crypto.randomBytes(32).toString('hex'),
+            'sticker-pack-name': packname,
+            'sticker-pack-publisher': config.OWNER_NAME,
+            emojis: ['🤖', '🎭', '💫']
+        };
+        
+        const exifAttr = Buffer.from([
+            0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x16, 0x00, 0x00, 0x00,
+        ]);
+        
+        const jsonBuffer = Buffer.from(JSON.stringify(json), 'utf8');
+        const exif = Buffer.concat([exifAttr, jsonBuffer]);
+        exif.writeUIntLE(jsonBuffer.length, 14, 4);
+        
+        img.exif = exif;
+        const finalBuffer = await img.save(null);
+        
+        await socket.sendMessage(sender, { sticker: finalBuffer }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+        
     } catch (error) {
-        console.error('Take command wrapper error:', error);
-        await socket.sendMessage(sender, { 
-            text: '❌ *Aɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ.* Pʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ ʟᴀᴛᴇʀ.' 
-        }, { quoted: msg });
+        console.error('Take command error:', error);
+        await socket.sendMessage(sender, {
+            text: '❌ Failed to steal sticker. Please try again.',
+            quoted: msg
+        });
     }
     break;
 }
@@ -2758,59 +2714,69 @@ case 'gc_tagadmins': {
     break;
 }
 //block case
+// Case: block - Block a user
 case 'block': {
     try {
-        // Check if user is owner (replace with your actual owner check logic)
-        const isOwner = true; // Replace with: yourOwnerList.includes(sender.split('@')[0]);
-        
+        // Owner only check
         if (!isOwner) {
             await socket.sendMessage(sender, {
-                react: {
-                    text: "❌",
-                    key: msg.key
-                }
+                text: '❌ *Owner Only Command*\n\nThis command can only be used by the bot owner.',
+                quoted: msg
             });
-            return await socket.sendMessage(sender, {
-                text: "❌ _Only the bot owner can use this command._"
-            }, { quoted: msg });
+            break;
         }
-
-        const chatId = msg.key.remoteJid; // Get current chat ID
         
-        // Send success message immediately
-        await socket.sendMessage(sender, { 
-            image: { url: `https://files.catbox.moe/8s2st9.jpg` },  
-            caption: "*ʙʟᴏᴄᴋᴇᴅ sᴜᴄᴄᴇsғᴜʟʟʏ✅*\n\nblocked",
-            buttons: [
-                { buttonId: '.allmenu', buttonText: { displayText: '🌟ᴀʟʟᴍᴇɴᴜ' }, type: 1 },
-                { buttonId: '.owner', buttonText: { displayText: '🎀ᴏᴡɴᴇʀ' }, type: 1 }
-            ]
-        }, { quoted: msg });
-
-        // React after sending the main message
-        await socket.sendMessage(sender, {
-            react: {
-                text: "✅",
-                key: msg.key
+        let target;
+        const ctx = msg.message?.extendedTextMessage?.contextInfo;
+        const mentioned = ctx?.mentionedJid || [];
+        
+        // Get target user from mention or reply
+        if (mentioned && mentioned.length > 0) {
+            target = mentioned[0];
+        } else if (ctx?.participant && ctx.stanzaId && ctx.quotedMessage) {
+            target = ctx.participant;
+        } else if (args[0]) {
+            // Clean phone number
+            let number = args[0].replace(/[^0-9]/g, '');
+            if (number.startsWith('0')) {
+                number = '254' + number.slice(1);
             }
+            if (number.length === 9) {
+                number = '254' + number;
+            }
+            target = number + '@s.whatsapp.net';
+        } else {
+            await socket.sendMessage(sender, {
+                text: '❌ *Usage:*\n\n.block @user\n.block 254700000000\n\nOr reply to a user\'s message with .block',
+                quoted: msg
+            });
+            break;
+        }
+        
+        if (!target || !target.includes('@')) {
+            await socket.sendMessage(sender, {
+                text: '❌ Invalid user format. Use @mention or phone number.',
+                quoted: msg
+            });
+            break;
+        }
+        
+        // Block the user
+        await socket.updateBlockStatus(target, 'block');
+        
+        // Send success message
+        await socket.sendMessage(sender, {
+            text: `✅ *User Blocked*\n\n┏━━━━━━━━━━━━━━━━━━┓\n┃ 🚫 User: @${target.split('@')[0]}\n┃ ✅ Status: BLOCKED\n┗━━━━━━━━━━━━━━━━━━┛\n\n> *CaseyRhodes Bot*`,
+            mentions: [target],
+            quoted: msg
         });
-
-        // Block the chat after sending the success message
-        await socket.updateBlockStatus(chatId, "block");
-
+        
     } catch (error) {
-        console.error("Block command error:", error);
-        
+        console.error('Block command error:', error);
         await socket.sendMessage(sender, {
-            react: {
-                text: "❌",
-                key: msg.key
-            }
+            text: `❌ *Error:* ${error.message}`,
+            quoted: msg
         });
-        
-        await socket.sendMessage(sender, {
-            text: `❌ _Failed to block this chat._\nError: ${error.message}_`
-        }, { quoted: msg });
     }
     break;
 }
@@ -8988,211 +8954,65 @@ case 'climate': {
     }
       //case repository 
       //case repository 
+// Case: repo - Show repository information
 case 'repo':
-case 'sc':
-case 'script': {
+case 'repository':
+case 'github': {
     try {
-        await socket.sendMessage(sender, { react: { text: '🪄', key: msg.key } });
-        
-        // Get repo info from GitHub API
-        const response = await fetch(`https://api.github.com/repos/caseyweb/CASEYRHODES-XMD`);
-        
-        if (!response.ok) throw new Error(`GitHub API error: ${response.status}`);
-        
-        const repoData = await response.json();
+        const repoText = `*📦 CASEYRHODES BOT REPOSITORY*\n\n` +
+                         `┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n` +
+                         `┃ 📌 *Bot Name:* ${config.OWNER_NAME}\n` +
+                         `┃ 🔢 *Version:* ${config.version}\n` +
+                         `┃ 👨‍💻 *Owner:* CaseyRhodes\n` +
+                         `┃ 📱 *WhatsApp:* wa.me/${config.OWNER_NUMBER}\n` +
+                         `┃ 📺 *YouTube:* @caseyrhodes\n` +
+                         `┃ 💻 *GitHub:* github.com/caseyweb\n` +
+                         `┗━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n` +
+                         `*📝 Description:*\n` +
+                         `Multi-device WhatsApp bot with advanced features including group management, sticker tools, media downloader, AI chat, and much more!\n\n` +
+                         `*⭐ Features:*\n` +
+                         `• 🎨 Sticker Creator & Stealer\n` +
+                         `• 📊 Group Management\n` +
+                         `• 🎵 Music Downloader\n` +
+                         `• 🤖 AI Chat Assistant\n` +
+                         `• 📰 News Updates\n` +
+                         `• 🔒 Anti-Call System\n` +
+                         `• 👑 Owner Controls\n\n` +
+                         `> *${config.BOT_FOOTER}*`;
 
-        const formattedInfo = `
-*🎀 𝐂𝐀𝐒𝐄𝐘𝐑𝐇𝐎𝐃𝐄𝐒 𝐌𝐈𝐍𝐈 🎀*
-*╭──────────────⊷*
-*┃* *ɴᴀᴍᴇ*        : ${repoData.name}
-*┃* *sᴛᴀʀs*       : ${repoData.stargazers_count}
-*┃* *ғᴏʀᴋs*       : ${repoData.forks_count}
-*┃* *ᴏᴡɴᴇʀ*       : ᴄᴀsᴇʏʀʜᴏᴅᴇs
-*┃* *ᴅᴇsᴄ*        : ${repoData.description || 'ɴ/ᴀ'}
-*╰──────────────⊷*
-
-📁 *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ*
-`;
-
-        const repoMessage = {
-            image: { url: 'https://i.ibb.co/fGSVG8vJ/caseyweb.jpg' },
-            caption: formattedInfo,
-            contextInfo: {
-                forwardingScore: 1,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '120363420261263259@newsletter',
-                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
-                    serverMessageId: -1
-                }
-            },
+        await socket.sendMessage(sender, {
+            text: repoText,
             buttons: [
                 {
-                    buttonId: `${config.PREFIX}repo-visit`,
-                    buttonText: { displayText: '🌐 Visit Repo' },
-                    type: 1
+                    name: 'cta_url',
+                    buttonParamsJson: JSON.stringify({
+                        display_text: 'YouTube',
+                        url: 'https://youtube.com/@caseyrhodes'
+                    })
                 },
                 {
-                    buttonId: `${config.PREFIX}repo-owner`,
-                    buttonText: { displayText: '👑 Owner Profile' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX}repo-audio`,
-                    buttonText: { displayText: '🎵 Play Intro' },
-                    type: 1
-                }
-            ]
-        };
-
-        await socket.sendMessage(from, repoMessage, { quoted: fakevCard });
-
-    } catch (error) {
-        console.error("❌ Error in repo command:", error);
-        // Fallback if API fails
-        const fallbackInfo = `
-*🎀 𝐂𝐀𝐒𝐄𝐘𝐑𝐇𝐎𝐃𝐄𝐒 𝐌𝐈𝐍𝐈 🎀*
-*╭──────────────⊷*
-*┃* *ɴᴀᴍᴇ*        : CASEYRHODES-XMD
-*┃* *sᴛᴀʀs*       : Loading...
-*┃* *ғᴏʀᴋs*       : Loading...
-*┃* *ᴏᴡɴᴇʀ*       : ᴄᴀsᴇʏʀʜᴏᴅᴇs
-*┃* *ᴅᴇsᴄ*        : WhatsApp Multi-Device Bot
-*╰──────────────⊷*
-
-📁 *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ*
-`;
-        
-        const fallbackMessage = {
-            image: { url: 'https://i.ibb.co/fGSVG8vJ/caseyweb.jpg' },
-            caption: fallbackInfo,
-            contextInfo: {
-                forwardingScore: 1,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '120363420261263259@newsletter',
-                    newsletterName: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs 🎀',
-                    serverMessageId: -1
-                }
-            },
-            buttons: [
-                {
-                    buttonId: `${config.PREFIX}repo-visit`,
-                    buttonText: { displayText: '🌐 Visit Repo' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX}repo-owner`,
-                    buttonText: { displayText: '👑 Owner Profile' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX}repo-audio`,
-                    buttonText: { displayText: '🎵 Play Intro' },
-                    type: 1
-                }
-            ]
-        };
-        
-        await socket.sendMessage(from, fallbackMessage, { quoted: fakevCard });
-    }
-    break;
-}
-
-// Button handlers for repo
-case 'repo-visit': {
-    try {
-        await socket.sendMessage(sender, { react: { text: '🌐', key: msg.key } });
-        
-        // Create button message with link
-        const visitMessage = {
-            text: `🌐 *Click the button below to visit the repository:*`,
-            buttons: [
-                {
-                    urlButton: {
-                        displayText: '🌟 Visit GitHub Repo',
-                        url: 'https://github.com/caseyweb/CASEYRHODES-XMD'
-                    }
-                },
-                {
-                    quickReplyButton: {
-                        displayText: '📋 Back to Menu',
-                        id: `${config.PREFIX}menu`
-                    }
-                }
-            ]
-        };
-        
-        await socket.sendMessage(from, visitMessage, { quoted: fakevCard });
-    } catch (error) {
-        console.error("Error in repo-visit:", error);
-        await socket.sendMessage(from, {
-            text: `🌐 *Repository Link:*\nhttps://github.com/caseyweb/CASEYRHODES-XMD`
-        }, { quoted: fakevCard });
-    }
-    break;
-}
-
-case 'repo-owner': {
-    try {
-        await socket.sendMessage(sender, { react: { text: '👑', key: msg.key } });
-        
-        // Create button message with link
-        const ownerMessage = {
-            text: `👑 *Click the button below to visit the owner's profile:*`,
-            buttons: [
-                {
-                    urlButton: {
-                        displayText: '👤 Visit Owner Profile',
+                    name: 'cta_url',
+                    buttonParamsJson: JSON.stringify({
+                        display_text: 'Visit Bot Repo',
                         url: 'https://github.com/caseyweb'
-                    }
+                    })
                 },
                 {
-                    quickReplyButton: {
-                        displayText: '📋 Back to Menu',
-                        id: `${config.PREFIX}menu`
-                    }
+                    name: 'cta_url',
+                    buttonParamsJson: JSON.stringify({
+                        display_text: 'Join Channel',
+                        url: config.CHANNEL_LINK
+                    })
                 }
             ]
-        };
+        }, { quoted: msg });
         
-        await socket.sendMessage(from, ownerMessage, { quoted: fakevCard });
     } catch (error) {
-        console.error("Error in repo-owner:", error);
-        await socket.sendMessage(from, {
-            text: `👑 *Owner Profile:*\nhttps://github.com/caseyweb`
-        }, { quoted: fakevCard });
-    }
-    break;
-}
-
-case 'repo-audio': {
-    try {
-        await socket.sendMessage(sender, { react: { text: '🎵', key: msg.key } });
-        
-        // First send a loading message
-        await socket.sendMessage(from, {
-            text: '🎵 *Preparing audio introduction...*'
-        }, { quoted: fakevCard });
-        
-        // Send audio file
-        await socket.sendMessage(from, {
-            audio: { url: 'https://files.catbox.moe/z47dgd.mp3' },
-            mimetype: 'audio/mp4',
-            ptt: true,
-            caption: '🎵 *CaseyRhodes Tech Audio Introduction*'
-        }, { quoted: fakevCard });
-        
-        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-        
-    } catch (audioError) {
-        console.error("Audio error:", audioError);
-        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-        
-        // Fallback to text if audio fails
-        await socket.sendMessage(from, {
-            text: "🎵 *Audio Introduction*\n\nSorry, the audio is currently unavailable. Please try again later."
-        }, { quoted: fakevCard });
+        console.error('Repo command error:', error);
+        await socket.sendMessage(sender, {
+            text: '❌ Failed to load repository information.',
+            quoted: msg
+        });
     }
     break;
 }
