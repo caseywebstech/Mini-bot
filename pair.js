@@ -36,7 +36,8 @@ const {
 } = require('@whiskeysockets/baileys');
 
 const config = {
-    selfMode: true,
+    selfMode: false,
+    anticall: false,
     AUTO_VIEW_STATUS: 'true',
     AUTO_LIKE_STATUS: 'true',
     AUTO_RECORDING: 'true',
@@ -733,6 +734,105 @@ function setupCommandHandlers(socket, number) {
                     break;
                 }
 
+                // Case: setprefix
+                case 'setprefix':
+                case 'prefix': {
+                    try {
+                        if (!isOwner) {
+                            await socket.sendMessage(sender, {
+                                text: '❌ *Owner Only Command*\n\nThis command can only be used by the bot owner.',
+                                quoted: msg
+                            });
+                            break;
+                        }
+
+                        if (args.length === 0) {
+                            await socket.sendMessage(sender, {
+                                text: `📌 *Current Prefix*\n\n┏━━━━━━━━━━━━━━━━━━┓\n┃ 🔹 Current prefix: *${config.PREFIX}*\n┗━━━━━━━━━━━━━━━━━━┛\n\n*Usage:*\n${config.PREFIX}setprefix <new prefix>\n\n*Example:*\n${config.PREFIX}setprefix !\n\n> *CaseyRhodes Bot*`,
+                                quoted: msg
+                            });
+                            break;
+                        }
+                        
+                        const newPrefix = args[0];
+                        
+                        if (newPrefix.length > 3) {
+                            await socket.sendMessage(sender, {
+                                text: '❌ *Invalid Prefix*\n\nPrefix must be 1-3 characters long!\n\n> *CaseyRhodes Bot*',
+                                quoted: msg
+                            });
+                            break;
+                        }
+                        
+                        const oldPrefix = config.PREFIX;
+                        config.PREFIX = newPrefix;
+                        prefix = newPrefix;
+                        
+                        await socket.sendMessage(sender, {
+                            text: `✅ *Prefix Changed*\n\n┏━━━━━━━━━━━━━━━━━━┓\n┃ 🔹 Old Prefix: *${oldPrefix}*\n┃ 🔸 New Prefix: *${newPrefix}*\n┗━━━━━━━━━━━━━━━━━━┛\n\n*Example:*\n${newPrefix}alive\n\n> *CaseyRhodes Bot*`,
+                            quoted: msg
+                        });
+                        
+                    } catch (error) {
+                        console.error('Setprefix command error:', error);
+                        await socket.sendMessage(sender, {
+                            text: '❌ Error changing prefix: ' + error.message,
+                            quoted: msg
+                        });
+                    }
+                    break;
+                }
+
+                // Case: anticall
+                case 'anticall': {
+                    try {
+                        if (!isOwner) {
+                            await socket.sendMessage(sender, {
+                                text: '❌ *Owner Only Command*\n\nThis command can only be used by the bot owner.',
+                                quoted: msg
+                            });
+                            break;
+                        }
+
+                        if (!args[0]) {
+                            const status = config.anticall ? '✅ ENABLED' : '❌ DISABLED';
+                            await socket.sendMessage(sender, {
+                                text: `📞 *Anti-Call System*\n\n┏━━━━━━━━━━━━━━━━━━┓\n┃ 📌 Status: *${status}*\n┗━━━━━━━━━━━━━━━━━━┛\n\n*Usage:*\n${prefix}anticall on - Enable anti-call\n${prefix}anticall off - Disable anti-call\n\nWhen enabled, calls will be auto-rejected & blocked.\n\n> *CaseyRhodes Bot*`,
+                                quoted: msg
+                            });
+                            break;
+                        }
+
+                        const option = args[0].toLowerCase();
+
+                        if (!['on', 'off'].includes(option)) {
+                            await socket.sendMessage(sender, {
+                                text: '❌ *Invalid Option*\n\nUsage: .anticall on/off\n\n> *CaseyRhodes Bot*',
+                                quoted: msg
+                            });
+                            break;
+                        }
+
+                        const enabled = option === 'on';
+                        config.anticall = enabled;
+
+                        await socket.sendMessage(sender, {
+                            text: enabled 
+                                ? '✅ *Anti-Call ENABLED*\n\nCalls will be auto-rejected & blocked.\n\n> *CaseyRhodes Bot*'
+                                : '❌ *Anti-Call DISABLED*\n\nCalls will not be blocked.\n\n> *CaseyRhodes Bot*',
+                            quoted: msg
+                        });
+
+                    } catch (error) {
+                        console.error('Anticall command error:', error);
+                        await socket.sendMessage(sender, {
+                            text: '❌ Error updating anti-call setting: ' + error.message,
+                            quoted: msg
+                        });
+                    }
+                    break;
+                }
+
                 // Case: alive
                 case 'uptime':
                 case 'alive': {
@@ -752,6 +852,8 @@ function setupCommandHandlers(socket, number) {
 *┃* ʏᴏᴜʀ ɴᴜᴍʙᴇʀ: ${number}
 *┃* ᴠᴇʀsɪᴏɴ: ${config.version}
 *┃* ᴍᴏᴅᴇ: ${config.selfMode ? '🔒 PRIVATE' : '🌐 PUBLIC'}
+*┃* ᴀɴᴛɪᴄᴀʟʟ: ${config.anticall ? '✅ ON' : '❌ OFF'}
+*┃* ᴘʀᴇғɪx: ${config.PREFIX}
 *┃* ᴍᴇᴍᴏʀʏ ᴜsᴀɢᴇ: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
 *╰───────────────┈⊷*
 
@@ -827,6 +929,8 @@ function setupCommandHandlers(socket, number) {
                                     `*┃* sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\n` +
                                     `*┃* ɴᴜᴍʙᴇʀ: ${number}\n` +
                                     `*┃* ᴍᴏᴅᴇ: ${config.selfMode ? '🔒 PRIVATE' : '🌐 PUBLIC'}\n` +
+                                    `*┃* ᴀɴᴛɪᴄᴀʟʟ: ${config.anticall ? '✅ ON' : '❌ OFF'}\n` +
+                                    `*┃* ᴘʀᴇғɪx: ${config.PREFIX}\n` +
                                     `*╰──────────────⊷*\n\n` +
                                     `Type *${config.PREFIX}menu* for commands`,
                             contextInfo: {
