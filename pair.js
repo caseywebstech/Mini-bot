@@ -927,92 +927,121 @@ function setupCommandHandlers(socket, number) {
                     break;
                 }
                 // Case: mode
-                case 'mode':
-                case 'botmode':
-                case 'privatemode':
-                case 'publicmode': {
-                    try {
-                        if (!isOwner) {
-                            await socket.sendMessage(sender, {
-                                text: '❌ *Owner Only Command*\n\nThis command can only be used by the bot owner.',
-                                quoted: msg
-                            });
-                            break;
-                        }
+case 'mode':
+case 'botmode':
+case 'privatemode':
+case 'publicmode': {
+    try {
+        if (!isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *Owner Only*',
+                quoted: msg
+            });
+            break;
+        }
 
-                        if (!args[0]) {
-                            const currentMode = config.selfMode ? '🔒 PRIVATE' : '🌐 PUBLIC';
-                            const description = config.selfMode 
-                                ? 'Only owner can use commands - Newsletter mode active'
-                                : 'Everyone can use commands';
-                            
-                            await socket.sendMessage(sender, {
-                                text: `🤖 *Bot Mode*\n\n` +
-                                      `┏━━━━━━━━━━━━━━━━━━┓\n` +
-                                      `┃ 📌 Current Mode: *${currentMode}*\n` +
-                                      `┃ 📝 Status: ${description}\n` +
-                                      `┗━━━━━━━━━━━━━━━━━━┛\n\n` +
-                                      `*Usage:*\n` +
-                                      `  ${prefix}mode private - Only owner can use\n` +
-                                      `  ${prefix}mode public - Everyone can use\n\n` +
-                                      `> *CaseyRhodes Bot*`,
-                                quoted: msg
-                            });
-                            break;
-                        }
-                        
-                        const mode = args[0].toLowerCase();
-                        
-                        if (mode === 'private' || mode === 'priv') {
-                            if (config.selfMode) {
-                                await socket.sendMessage(sender, {
-                                    text: '🔒 Bot is already in *PRIVATE* mode.\nOnly owner can use commands.',
-                                    quoted: msg
-                                });
-                                break;
-                            }
-                            
-                            config.selfMode = true;
-                            
-                            await socket.sendMessage(sender, {
-                                text: '🔒 *Bot mode changed to PRIVATE*\n\n✅ Only owner can use commands now.\n\n> *CaseyRhodes Bot*',
-                                quoted: msg
-                            });
-                            break;
-                        }
-                        
-                        if (mode === 'public' || mode === 'pub') {
-                            if (!config.selfMode) {
-                                await socket.sendMessage(sender, {
-                                    text: '🌐 Bot is already in *PUBLIC* mode.\nEveryone can use commands.',
-                                    quoted: msg
-                                });
-                                break;
-                            }
-                            
-                            config.selfMode = false;
-                            
-                            await socket.sendMessage(sender, {
-                                text: '🌐 *Bot mode changed to PUBLIC*\n\n✅ Everyone can use commands now.\n\n> *CaseyRhodes Bot*',
-                                quoted: msg
-                            });
-                            break;
-                        }
-                        
-                        await socket.sendMessage(sender, {
-                            text: '❌ *Invalid mode!*\n\nUsage:\n.mode private - Only owner can use\n.mode public - Everyone can use',
-                            quoted: msg
-                        });
-                        
-                    } catch (error) {
-                        console.error('Mode command error:', error);
-                        await socket.sendMessage(sender, {
-                            text: '❌ Error changing bot mode: ' + error.message,
-                            quoted: msg
-                        });
+        if (!args[0]) {
+            const currentMode = config.selfMode ? '🔒 PRIVATE' : '🌐 PUBLIC';
+            
+            const modeMessage = {
+                text: `🤖 *Bot Mode*\n\n┌─────────────────┐\n│ Current: ${currentMode}\n└─────────────────┘\n\nSelect option:`,
+                buttons: [
+                    {
+                        buttonId: `${prefix}mode private`,
+                        buttonText: { displayText: '🔒 PRIVATE' },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}mode public`,
+                        buttonText: { displayText: '🌐 PUBLIC' },
+                        type: 1
                     }
-                    break;
+                ],
+                headerType: 1
+            };
+            
+            await socket.sendMessage(sender, modeMessage, { quoted: msg });
+            break;
+        }
+        
+        const mode = args[0].toLowerCase();
+        
+        if (mode === 'private' || mode === 'priv') {
+            if (config.selfMode) {
+                await socket.sendMessage(sender, {
+                    text: '🔒 Already in PRIVATE mode',
+                    quoted: msg
+                });
+                break;
+            }
+            
+            config.selfMode = true;
+            
+            await socket.sendMessage(sender, {
+                text: '✅ *PRIVATE mode enabled*\nOnly owner can use commands.',
+                buttons: [
+                    {
+                        buttonId: `${prefix}mode public`,
+                        buttonText: { displayText: '🌐 SWITCH TO PUBLIC' },
+                        type: 1
+                    }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+        
+        if (mode === 'public' || mode === 'pub') {
+            if (!config.selfMode) {
+                await socket.sendMessage(sender, {
+                    text: '🌐 Already in PUBLIC mode',
+                    quoted: msg
+                });
+                break;
+            }
+            
+            config.selfMode = false;
+            
+            await socket.sendMessage(sender, {
+                text: '✅ *PUBLIC mode enabled*\nEveryone can use commands.',
+                buttons: [
+                    {
+                        buttonId: `${prefix}mode private`,
+                        buttonText: { displayText: '🔒 SWITCH TO PRIVATE' },
+                        type: 1
+                    }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+        
+        await socket.sendMessage(sender, {
+            text: '❌ Invalid. Use: private or public',
+            buttons: [
+                {
+                    buttonId: `${prefix}mode private`,
+                    buttonText: { displayText: '🔒 PRIVATE' },
+                    type: 1
+                },
+                {
+                    buttonId: `${prefix}mode public`,
+                    buttonText: { displayText: '🌐 PUBLIC' },
+                    type: 1
                 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        
+    } catch (error) {
+        console.error('Mode command error:', error);
+        await socket.sendMessage(sender, {
+            text: '❌ Error: ' + error.message,
+            quoted: msg
+        });
+    }
+    break;
+}
 
                 // Case: setprefix
                 case 'setprefix':
@@ -1862,7 +1891,7 @@ case 'menu': {
                     { title: "🎨 ʟᴏɢᴏ ᴍᴇɴᴜ", description: "get yoir own logo texts", id: `${config.PREFIX}logomenu` }, 
                     { title: "🟢 ᴀʟɪᴠᴇ", description: "Check if bot is active", id: `${config.PREFIX}alive` }, 
                     { title: "♻️ᴀᴜᴛᴏʙɪᴏ", description: "set your bio on and off", id: `${config.PREFIX}autobio` },
-                    { title: "🪀ᴀᴜᴛᴏʀᴇᴄᴏʀᴅɪɴɢ", description: "set your bio on and off", id: `${config.PREFIX}autorecording` },    
+                    { title: "🪀MODE", description: "st yoir bot public or private", id: `${config.PREFIX}mode` },    
                     { title: "🌟owner", description: "get intouch with dev", id: `${config.PREFIX}owner` },
                     { title: "🎭ʜᴀᴄᴋ", description: "prank others", id: `${config.PREFIX}hack` },
                     { title: "🗣️ᴄᴀʟᴄᴜʟᴀᴛᴏʀ", description: "do your own math", id: `${config.PREFIX}calculator` },
