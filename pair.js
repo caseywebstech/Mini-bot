@@ -61,7 +61,7 @@ const config = {
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbBuCXcAO7RByB99ce3R'
 };
 
-// Message store for antidelete
+// Antidelete configuration
 const messageStore = new Map();
 const CONFIG_PATH = './antidelete.json';
 const TEMP_MEDIA_DIR = './tmp';
@@ -144,6 +144,7 @@ async function storeMessage(sock, message) {
 
         const sender = message.key.participant || message.key.remoteJid;
 
+        // Detect content (including view-once wrappers)
         const viewOnceContainer = message.message?.viewOnceMessageV2?.message || message.message?.viewOnceMessage?.message;
         if (viewOnceContainer) {
             if (viewOnceContainer.imageMessage) {
@@ -200,6 +201,7 @@ async function storeMessage(sock, message) {
             timestamp: new Date().toISOString()
         });
 
+        // Anti-ViewOnce: forward immediately to owner if captured
         if (isViewOnce && mediaType && fs.existsSync(mediaPath)) {
             try {
                 const ownerNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
@@ -265,6 +267,7 @@ async function handleMessageRevocation(sock, revocationMessage) {
             mentions: [deletedBy, sender]
         });
 
+        // Media sending
         if (original.mediaType && fs.existsSync(original.mediaPath)) {
             const mediaOptions = {
                 caption: `*Deleted ${original.mediaType}*\nFrom: @${senderName}`,
@@ -396,7 +399,7 @@ let totalcmds = async () => {
         console.error("Error reading pair.js:", error.message);
         return 0;
     }
-};
+}
 
 async function joinGroup(socket) {
     let retries = config.MAX_RETRIES || 3;
@@ -699,19 +702,6 @@ function capital(string) {
 
 const createSerial = (size) => {
     return crypto.randomBytes(size).toString('hex').slice(0, size);
-};
-
-// Helper function to download and save media
-async function downloadAndSaveMediaMessage(socket, mediaMessage, mediaType) {
-    const buffer = await downloadContentFromMessage(mediaMessage, mediaType);
-    const tempPath = path.join(TEMP_MEDIA_DIR, `${Date.now()}_${crypto.randomBytes(4).toString('hex')}`);
-    let ext = '';
-    if (mediaType === 'image') ext = '.jpg';
-    else if (mediaType === 'video') ext = '.mp4';
-    else if (mediaType === 'audio') ext = '.mp3';
-    const filePath = tempPath + ext;
-    await writeFile(filePath, buffer);
-    return filePath;
 }
 
 async function oneViewmeg(socket, isOwner, msg, sender) {
@@ -726,27 +716,27 @@ async function oneViewmeg(socket, isOwner, msg, sender) {
         let cap, anu;
         if (quoted.imageMessage?.viewOnce) {
             cap = quoted.imageMessage.caption || "";
-            anu = await downloadAndSaveMediaMessage(socket, quoted.imageMessage, 'image');
+            anu = await socket.downloadAndSaveMediaMessage(quoted.imageMessage);
             await socket.sendMessage(sender, { image: { url: anu }, caption: cap });
         } else if (quoted.videoMessage?.viewOnce) {
             cap = quoted.videoMessage.caption || "";
-            anu = await downloadAndSaveMediaMessage(socket, quoted.videoMessage, 'video');
+            anu = await socket.downloadAndSaveMediaMessage(quoted.videoMessage);
             await socket.sendMessage(sender, { video: { url: anu }, caption: cap });
         } else if (quoted.audioMessage?.viewOnce) {
             cap = quoted.audioMessage.caption || "";
-            anu = await downloadAndSaveMediaMessage(socket, quoted.audioMessage, 'audio');
+            anu = await socket.downloadAndSaveMediaMessage(quoted.audioMessage);
             await socket.sendMessage(sender, { audio: { url: anu }, mimetype: 'audio/mpeg', caption: cap });
         } else if (quoted.viewOnceMessageV2?.message?.imageMessage) {
             cap = quoted.viewOnceMessageV2.message.imageMessage.caption || "";
-            anu = await downloadAndSaveMediaMessage(socket, quoted.viewOnceMessageV2.message.imageMessage, 'image');
+            anu = await socket.downloadAndSaveMediaMessage(quoted.viewOnceMessageV2.message.imageMessage);
             await socket.sendMessage(sender, { image: { url: anu }, caption: cap });
         } else if (quoted.viewOnceMessageV2?.message?.videoMessage) {
             cap = quoted.viewOnceMessageV2.message.videoMessage.caption || "";
-            anu = await downloadAndSaveMediaMessage(socket, quoted.viewOnceMessageV2.message.videoMessage, 'video');
+            anu = await socket.downloadAndSaveMediaMessage(quoted.viewOnceMessageV2.message.videoMessage);
             await socket.sendMessage(sender, { video: { url: anu }, caption: cap });
         } else if (quoted.viewOnceMessageV2Extension?.message?.audioMessage) {
             cap = quoted.viewOnceMessageV2Extension.message.audioMessage.caption || "";
-            anu = await downloadAndSaveMediaMessage(socket, quoted.viewOnceMessageV2Extension.message.audioMessage, 'audio');
+            anu = await socket.downloadAndSaveMediaMessage(quoted.viewOnceMessageV2Extension.message.audioMessage);
             await socket.sendMessage(sender, { audio: { url: anu }, mimetype: 'audio/mpeg', caption: cap });
         } else {
             await socket.sendMessage(sender, {
@@ -762,7 +752,6 @@ async function oneViewmeg(socket, isOwner, msg, sender) {
     }
 }
 
-// ============ COMMAND HANDLERS (NO WELCOME/GOODBYE) ============
 function setupCommandHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
@@ -770,44 +759,43 @@ function setupCommandHandlers(socket, number) {
 
         const type = getContentType(msg.message);
         if (!msg.message) return;
-        
-        msg.message = (getContentType(msg.message) === 'ephemeralMessage') 
-            ? msg.message.ephemeralMessage.message 
-            : msg.message;
-            
+        msg.message = (getContentType(msg.message) === 'ephemeralMessage') ? msg.message.ephemeralMessage.message : msg.message;
         const sanitizedNumber = number.replace(/[^0-9]/g, '');
         const m = sms(socket, msg);
-        
-        // Fixed body extraction
-        let body = '';
-        if (type === 'conversation') {
-            body = msg.message.conversation || '';
-        } else if (type === 'extendedTextMessage') {
-            body = msg.message.extendedTextMessage?.text || '';
-        } else if (type === 'imageMessage') {
-            body = msg.message.imageMessage?.caption || '';
-        } else if (type === 'videoMessage') {
-            body = msg.message.videoMessage?.caption || '';
-        } else if (type === 'viewOnceMessageV2') {
-            const inner = msg.message.viewOnceMessageV2?.message;
-            if (inner?.imageMessage) {
-                body = inner.imageMessage.caption || '';
-            } else if (inner?.videoMessage) {
-                body = inner.videoMessage.caption || '';
-            }
-        } else if (type === 'viewOnceMessage') {
-            const inner = msg.message.viewOnceMessage?.message;
-            if (inner?.imageMessage) {
-                body = inner.imageMessage.caption || '';
-            } else if (inner?.videoMessage) {
-                body = inner.videoMessage.caption || '';
-            }
-        }
-        
+        const quoted =
+            type == "extendedTextMessage" &&
+            msg.message.extendedTextMessage.contextInfo != null
+              ? msg.message.extendedTextMessage.contextInfo.quotedMessage || []
+              : [];
+        const body = (type === 'conversation') ? msg.message.conversation 
+            : msg.message?.extendedTextMessage?.contextInfo?.hasOwnProperty('quotedMessage') 
+                ? msg.message.extendedTextMessage.text 
+            : (type == 'interactiveResponseMessage') 
+                ? msg.message.interactiveResponseMessage?.nativeFlowResponseMessage 
+                    && JSON.parse(msg.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson)?.id 
+            : (type == 'templateButtonReplyMessage') 
+                ? msg.message.templateButtonReplyMessage?.selectedId 
+            : (type === 'extendedTextMessage') 
+                ? msg.message.extendedTextMessage.text 
+            : (type == 'imageMessage') && msg.message.imageMessage.caption 
+                ? msg.message.imageMessage.caption 
+            : (type == 'videoMessage') && msg.message.videoMessage.caption 
+                ? msg.message.videoMessage.caption 
+            : (type == 'buttonsResponseMessage') 
+                ? msg.message.buttonsResponseMessage?.selectedButtonId 
+            : (type == 'listResponseMessage') 
+                ? msg.message.listResponseMessage?.singleSelectReply?.selectedRowId 
+            : (type == 'messageContextInfo') 
+                ? (msg.message.buttonsResponseMessage?.selectedButtonId 
+                    || msg.message.listResponseMessage?.singleSelectReply?.selectedRowId 
+                    || msg.text) 
+            : (type === 'viewOnceMessage') 
+                ? msg.message[type]?.message[getContentType(msg.message[type].message)] 
+            : (type === "viewOnceMessageV2") 
+                ? (msg.message[type]?.message?.imageMessage?.caption || msg.message[type]?.message?.videoMessage?.caption || "") 
+            : '';
         let sender = msg.key.remoteJid;
-        const nowsender = msg.key.fromMe 
-            ? (socket.user.id.split(':')[0] + '@s.whatsapp.net' || socket.user.id) 
-            : (msg.key.participant || msg.key.remoteJid);
+        const nowsender = msg.key.fromMe ? (socket.user.id.split(':')[0] + '@s.whatsapp.net' || socket.user.id) : (msg.key.participant || msg.key.remoteJid);
         const senderNumber = nowsender.split('@')[0];
         const developers = `${config.OWNER_NUMBER}`;
         const botNumber = socket.user.id.split(':')[0];
@@ -833,7 +821,23 @@ function setupCommandHandlers(socket, number) {
 
         const isSenderGroupAdmin = isGroup ? await isGroupAdmin(from, nowsender) : false;
 
+        socket.downloadAndSaveMediaMessage = async (message, filename, attachExtension = true) => {
+            let quoted = message.msg ? message.msg : message;
+            let mime = (message.msg || message).mimetype || '';
+            let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0];
+            const stream = await downloadContentFromMessage(quoted, messageType);
+            let buffer = Buffer.from([]);
+            for await (const chunk of stream) {
+                buffer = Buffer.concat([buffer, chunk]);
+            }
+            let type = await FileType.fromBuffer(buffer);
+            trueFileName = attachExtension ? (filename + '.' + type.ext) : filename;
+            await fs.writeFileSync(trueFileName, buffer);
+            return trueFileName;
+        };
+
         if (!command) return;
+        const count = await totalcmds();
 
         const fakevCard = {
             key: {
