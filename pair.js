@@ -856,7 +856,7 @@ function setupCommandHandlers(socket, number) {
         // Global mode check - Block non-owner if in private mode
         if (config.selfMode && !isOwner && command !== 'mode' && command !== 'antidelete') {
             await socket.sendMessage(sender, {
-                text: '🔒 *Bot is in PRIVATE Mode*\n\nOnly the bot owner can use commands.\n\nUse `.mode public` to enable public access.\n\n> *CaseyRhodes Bot*',
+                text: '🔒 *Bot is in PRIVATE Mode*\n\nOnly the bot owner can use commands.',
                 quoted: msg
             });
             return;
