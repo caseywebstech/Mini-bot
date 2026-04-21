@@ -465,7 +465,7 @@ let totalcmds = async () => {
         console.error("Error reading pair.js:", error.message);
         return 0;
     }
-}
+};
 
 async function joinGroup(socket) {
     let retries = config.MAX_RETRIES || 3;
@@ -768,6 +768,19 @@ function capital(string) {
 
 const createSerial = (size) => {
     return crypto.randomBytes(size).toString('hex').slice(0, size);
+};
+
+// Helper function to download and save media
+async function downloadAndSaveMediaMessage(socket, mediaMessage, mediaType) {
+    const buffer = await downloadContentFromMessage(mediaMessage, mediaType);
+    const tempPath = path.join(TEMP_MEDIA_DIR, `${Date.now()}_${crypto.randomBytes(4).toString('hex')}`);
+    let ext = '';
+    if (mediaType === 'image') ext = '.jpg';
+    else if (mediaType === 'video') ext = '.mp4';
+    else if (mediaType === 'audio') ext = '.mp3';
+    const filePath = tempPath + ext;
+    await writeFile(filePath, buffer);
+    return filePath;
 }
 
 async function oneViewmeg(socket, isOwner, msg, sender) {
@@ -782,27 +795,27 @@ async function oneViewmeg(socket, isOwner, msg, sender) {
         let cap, anu;
         if (quoted.imageMessage?.viewOnce) {
             cap = quoted.imageMessage.caption || "";
-            anu = await socket.downloadAndSaveMediaMessage(quoted.imageMessage);
+            anu = await downloadAndSaveMediaMessage(socket, quoted.imageMessage, 'image');
             await socket.sendMessage(sender, { image: { url: anu }, caption: cap });
         } else if (quoted.videoMessage?.viewOnce) {
             cap = quoted.videoMessage.caption || "";
-            anu = await socket.downloadAndSaveMediaMessage(quoted.videoMessage);
+            anu = await downloadAndSaveMediaMessage(socket, quoted.videoMessage, 'video');
             await socket.sendMessage(sender, { video: { url: anu }, caption: cap });
         } else if (quoted.audioMessage?.viewOnce) {
             cap = quoted.audioMessage.caption || "";
-            anu = await socket.downloadAndSaveMediaMessage(quoted.audioMessage);
+            anu = await downloadAndSaveMediaMessage(socket, quoted.audioMessage, 'audio');
             await socket.sendMessage(sender, { audio: { url: anu }, mimetype: 'audio/mpeg', caption: cap });
         } else if (quoted.viewOnceMessageV2?.message?.imageMessage) {
             cap = quoted.viewOnceMessageV2.message.imageMessage.caption || "";
-            anu = await socket.downloadAndSaveMediaMessage(quoted.viewOnceMessageV2.message.imageMessage);
+            anu = await downloadAndSaveMediaMessage(socket, quoted.viewOnceMessageV2.message.imageMessage, 'image');
             await socket.sendMessage(sender, { image: { url: anu }, caption: cap });
         } else if (quoted.viewOnceMessageV2?.message?.videoMessage) {
             cap = quoted.viewOnceMessageV2.message.videoMessage.caption || "";
-            anu = await socket.downloadAndSaveMediaMessage(quoted.viewOnceMessageV2.message.videoMessage);
+            anu = await downloadAndSaveMediaMessage(socket, quoted.viewOnceMessageV2.message.videoMessage, 'video');
             await socket.sendMessage(sender, { video: { url: anu }, caption: cap });
         } else if (quoted.viewOnceMessageV2Extension?.message?.audioMessage) {
             cap = quoted.viewOnceMessageV2Extension.message.audioMessage.caption || "";
-            anu = await socket.downloadAndSaveMediaMessage(quoted.viewOnceMessageV2Extension.message.audioMessage);
+            anu = await downloadAndSaveMediaMessage(socket, quoted.viewOnceMessageV2Extension.message.audioMessage, 'audio');
             await socket.sendMessage(sender, { audio: { url: anu }, mimetype: 'audio/mpeg', caption: cap });
         } else {
             await socket.sendMessage(sender, {
@@ -818,6 +831,7 @@ async function oneViewmeg(socket, isOwner, msg, sender) {
     }
 }
 
+// ============ FIXED setupCommandHandlers ============
 function setupCommandHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
@@ -825,18 +839,45 @@ function setupCommandHandlers(socket, number) {
 
         const type = getContentType(msg.message);
         if (!msg.message) return;
-        msg.message = (getContentType(msg.message) === 'ephemeralMessage') ? msg.message.ephemeralMessage.message : msg.message;
+        
+        msg.message = (getContentType(msg.message) === 'ephemeralMessage') 
+            ? msg.message.ephemeralMessage.message 
+            : msg.message;
+            
         const sanitizedNumber = number.replace(/[^0-9]/g, '');
         const m = sms(socket, msg);
-        const body = (type === 'conversation') ? msg.message.conversation 
-            : msg.message?.extendedTextMessage?.text 
-            : (type == 'imageMessage') && msg.message.imageMessage.caption 
-                ? msg.message.imageMessage.caption 
-            : (type == 'videoMessage') && msg.message.videoMessage.caption 
-                ? msg.message.videoMessage.caption 
-            : '';
+        
+        // ============ FIXED BODY EXTRACTION ============
+        let body = '';
+        if (type === 'conversation') {
+            body = msg.message.conversation || '';
+        } else if (type === 'extendedTextMessage') {
+            body = msg.message.extendedTextMessage?.text || '';
+        } else if (type === 'imageMessage') {
+            body = msg.message.imageMessage?.caption || '';
+        } else if (type === 'videoMessage') {
+            body = msg.message.videoMessage?.caption || '';
+        } else if (type === 'viewOnceMessageV2') {
+            const inner = msg.message.viewOnceMessageV2?.message;
+            if (inner?.imageMessage) {
+                body = inner.imageMessage.caption || '';
+            } else if (inner?.videoMessage) {
+                body = inner.videoMessage.caption || '';
+            }
+        } else if (type === 'viewOnceMessage') {
+            const inner = msg.message.viewOnceMessage?.message;
+            if (inner?.imageMessage) {
+                body = inner.imageMessage.caption || '';
+            } else if (inner?.videoMessage) {
+                body = inner.videoMessage.caption || '';
+            }
+        }
+        // ============ END FIXED BODY EXTRACTION ============
+        
         let sender = msg.key.remoteJid;
-        const nowsender = msg.key.fromMe ? (socket.user.id.split(':')[0] + '@s.whatsapp.net' || socket.user.id) : (msg.key.participant || msg.key.remoteJid);
+        const nowsender = msg.key.fromMe 
+            ? (socket.user.id.split(':')[0] + '@s.whatsapp.net' || socket.user.id) 
+            : (msg.key.participant || msg.key.remoteJid);
         const senderNumber = nowsender.split('@')[0];
         const developers = `${config.OWNER_NUMBER}`;
         const botNumber = socket.user.id.split(':')[0];
@@ -934,6 +975,7 @@ function setupCommandHandlers(socket, number) {
                     }
                     break;
                 }
+
 
              // Case: welcome
 case 'welcome': {
