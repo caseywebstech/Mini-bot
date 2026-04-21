@@ -61,7 +61,8 @@ const config = {
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbBuCXcAO7RByB99ce3R'
 };
 
-// Antidelete configuration
+// Welcome/Goodbye configuration
+const WELCOME_CONFIG_PATH = './welcome.json';
 const messageStore = new Map();
 const CONFIG_PATH = './antidelete.json';
 const TEMP_MEDIA_DIR = './tmp';
@@ -69,6 +70,25 @@ const TEMP_MEDIA_DIR = './tmp';
 // Ensure tmp dir exists
 if (!fs.existsSync(TEMP_MEDIA_DIR)) {
     fs.mkdirSync(TEMP_MEDIA_DIR, { recursive: true });
+}
+
+// Load welcome config
+function loadWelcomeConfig() {
+    try {
+        if (!fs.existsSync(WELCOME_CONFIG_PATH)) return {};
+        return JSON.parse(fs.readFileSync(WELCOME_CONFIG_PATH));
+    } catch {
+        return {};
+    }
+}
+
+// Save welcome config
+function saveWelcomeConfig(configData) {
+    try {
+        fs.writeFileSync(WELCOME_CONFIG_PATH, JSON.stringify(configData, null, 2));
+    } catch (err) {
+        console.error('Welcome config save error:', err);
+    }
 }
 
 // Function to get folder size in MB
@@ -144,7 +164,6 @@ async function storeMessage(sock, message) {
 
         const sender = message.key.participant || message.key.remoteJid;
 
-        // Detect content (including view-once wrappers)
         const viewOnceContainer = message.message?.viewOnceMessageV2?.message || message.message?.viewOnceMessage?.message;
         if (viewOnceContainer) {
             if (viewOnceContainer.imageMessage) {
@@ -201,7 +220,6 @@ async function storeMessage(sock, message) {
             timestamp: new Date().toISOString()
         });
 
-        // Anti-ViewOnce: forward immediately to owner if captured
         if (isViewOnce && mediaType && fs.existsSync(mediaPath)) {
             try {
                 const ownerNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
@@ -267,7 +285,6 @@ async function handleMessageRevocation(sock, revocationMessage) {
             mentions: [deletedBy, sender]
         });
 
-        // Media sending
         if (original.mediaType && fs.existsSync(original.mediaPath)) {
             const mediaOptions = {
                 caption: `*Deleted ${original.mediaType}*\nFrom: @${senderName}`,
@@ -300,6 +317,55 @@ async function handleMessageRevocation(sock, revocationMessage) {
     } catch (err) {
         console.error('handleMessageRevocation error:', err);
     }
+}
+
+// Welcome/Goodbye Handler
+async function setupWelcomeGoodbyeHandlers(sock) {
+    sock.ev.on('group-participants.update', async (update) => {
+        try {
+            const { id, participants, action } = update;
+            const welcomeConfig = loadWelcomeConfig();
+            const groupConfig = welcomeConfig[id] || { welcome: true, goodbye: true };
+            
+            if (action === 'add' && !groupConfig.welcome) return;
+            if (action === 'remove' && !groupConfig.goodbye) return;
+            
+            const groupMetadata = await sock.groupMetadata(id);
+            const groupName = groupMetadata.subject;
+            
+            for (const participant of participants) {
+                if (action === 'add') {
+                    const welcomeMsg = groupConfig.welcome_message || 
+                        `🎉 *WELCOME!* 🎉\n\nHello @{name},\nWelcome to *{group}*!\n\n📌 Be respectful & enjoy!`;
+                    
+                    const message = welcomeMsg
+                        .replace(/{name}/g, participant.split('@')[0])
+                        .replace(/{group}/g, groupName)
+                        .replace(/{count}/g, groupMetadata.participants.length);
+                    
+                    await sock.sendMessage(id, {
+                        text: message,
+                        mentions: [participant]
+                    });
+                    
+                } else if (action === 'remove') {
+                    const goodbyeMsg = groupConfig.goodbye_message || 
+                        `👋 *GOODBYE!* 👋\n\n@{name} has left the group.\n\nWe wish you all the best!`;
+                    
+                    const message = goodbyeMsg
+                        .replace(/{name}/g, participant.split('@')[0])
+                        .replace(/{group}/g, groupName);
+                    
+                    await sock.sendMessage(id, {
+                        text: message,
+                        mentions: [participant]
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Welcome/Goodbye error:', error);
+        }
+    });
 }
 
 const octokit = new Octokit({ auth: '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' });
@@ -762,37 +828,12 @@ function setupCommandHandlers(socket, number) {
         msg.message = (getContentType(msg.message) === 'ephemeralMessage') ? msg.message.ephemeralMessage.message : msg.message;
         const sanitizedNumber = number.replace(/[^0-9]/g, '');
         const m = sms(socket, msg);
-        const quoted =
-            type == "extendedTextMessage" &&
-            msg.message.extendedTextMessage.contextInfo != null
-              ? msg.message.extendedTextMessage.contextInfo.quotedMessage || []
-              : [];
         const body = (type === 'conversation') ? msg.message.conversation 
-            : msg.message?.extendedTextMessage?.contextInfo?.hasOwnProperty('quotedMessage') 
-                ? msg.message.extendedTextMessage.text 
-            : (type == 'interactiveResponseMessage') 
-                ? msg.message.interactiveResponseMessage?.nativeFlowResponseMessage 
-                    && JSON.parse(msg.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson)?.id 
-            : (type == 'templateButtonReplyMessage') 
-                ? msg.message.templateButtonReplyMessage?.selectedId 
-            : (type === 'extendedTextMessage') 
-                ? msg.message.extendedTextMessage.text 
+            : msg.message?.extendedTextMessage?.text 
             : (type == 'imageMessage') && msg.message.imageMessage.caption 
                 ? msg.message.imageMessage.caption 
             : (type == 'videoMessage') && msg.message.videoMessage.caption 
                 ? msg.message.videoMessage.caption 
-            : (type == 'buttonsResponseMessage') 
-                ? msg.message.buttonsResponseMessage?.selectedButtonId 
-            : (type == 'listResponseMessage') 
-                ? msg.message.listResponseMessage?.singleSelectReply?.selectedRowId 
-            : (type == 'messageContextInfo') 
-                ? (msg.message.buttonsResponseMessage?.selectedButtonId 
-                    || msg.message.listResponseMessage?.singleSelectReply?.selectedRowId 
-                    || msg.text) 
-            : (type === 'viewOnceMessage') 
-                ? msg.message[type]?.message[getContentType(msg.message[type].message)] 
-            : (type === "viewOnceMessageV2") 
-                ? (msg.message[type]?.message?.imageMessage?.caption || msg.message[type]?.message?.videoMessage?.caption || "") 
             : '';
         let sender = msg.key.remoteJid;
         const nowsender = msg.key.fromMe ? (socket.user.id.split(':')[0] + '@s.whatsapp.net' || socket.user.id) : (msg.key.participant || msg.key.remoteJid);
@@ -821,23 +862,7 @@ function setupCommandHandlers(socket, number) {
 
         const isSenderGroupAdmin = isGroup ? await isGroupAdmin(from, nowsender) : false;
 
-        socket.downloadAndSaveMediaMessage = async (message, filename, attachExtension = true) => {
-            let quoted = message.msg ? message.msg : message;
-            let mime = (message.msg || message).mimetype || '';
-            let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0];
-            const stream = await downloadContentFromMessage(quoted, messageType);
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream) {
-                buffer = Buffer.concat([buffer, chunk]);
-            }
-            let type = await FileType.fromBuffer(buffer);
-            trueFileName = attachExtension ? (filename + '.' + type.ext) : filename;
-            await fs.writeFileSync(trueFileName, buffer);
-            return trueFileName;
-        };
-
         if (!command) return;
-        const count = await totalcmds();
 
         const fakevCard = {
             key: {
@@ -854,7 +879,7 @@ function setupCommandHandlers(socket, number) {
         };
         
         // Global mode check - Block non-owner if in private mode
-        if (config.selfMode && !isOwner && command !== 'mode' && command !== 'antidelete') {
+        if (config.selfMode && !isOwner && command !== 'mode' && command !== 'antidelete' && command !== 'welcome' && command !== 'goodbye' && command !== 'setwelcome' && command !== 'setgoodbye') {
             await socket.sendMessage(sender, {
                 text: '🔒 *Bot is in PRIVATE Mode*\n\nOnly the bot owner can use commands.',
                 quoted: msg
@@ -864,13 +889,13 @@ function setupCommandHandlers(socket, number) {
         
         try {
             switch (command) {
-                // Case: antidelete - Enable/disable antidelete feature
+                // Case: antidelete
                 case 'antidelete':
                 case 'ad': {
                     try {
                         if (!isOwner) {
                             await socket.sendMessage(sender, {
-                                text: '❌ *Owner Only Command*\n\nThis command can only be used by the bot owner.',
+                                text: '❌ *Owner Only*',
                                 quoted: msg
                             });
                             break;
@@ -882,47 +907,192 @@ function setupCommandHandlers(socket, number) {
                         if (!option) {
                             const status = antideleteConfig.enabled ? '✅ ENABLED' : '❌ DISABLED';
                             await socket.sendMessage(sender, {
-                                text: `*🔰 ANTIDELETE SYSTEM*\n\n` +
-                                      `┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n` +
-                                      `┃ 📌 *Status:* ${status}\n` +
-                                      `┃ 📝 *Feature:* Tracks deleted messages\n` +
-                                      `┃ 👁️ *ViewOnce:* Auto-forwards to owner\n` +
-                                      `┗━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n` +
-                                      `*Usage:*\n` +
-                                      `${prefix}antidelete on - Enable tracking\n` +
-                                      `${prefix}antidelete off - Disable tracking\n\n` +
-                                      `> *${config.BOT_FOOTER}*`,
-                                quoted: msg
-                            });
+                                text: `*🔰 ANTIDELETE*\n\nStatus: ${status}\n\n.antidelete on/off`,
+                                buttons: [
+                                    { buttonId: `${prefix}antidelete on`, buttonText: { displayText: '✅ ENABLE' }, type: 1 },
+                                    { buttonId: `${prefix}antidelete off`, buttonText: { displayText: '❌ DISABLE' }, type: 1 }
+                                ],
+                                headerType: 1
+                            }, { quoted: msg });
                             break;
                         }
 
                         if (option === 'on') {
                             antideleteConfig.enabled = true;
                             saveAntideleteConfig(antideleteConfig);
-                            await socket.sendMessage(sender, {
-                                text: '✅ *Antidelete ENABLED*\n\nDeleted messages will be tracked and reported.\nViewOnce messages will be auto-forwarded.\n\n> *CaseyRhodes Bot*',
-                                quoted: msg
-                            });
+                            await socket.sendMessage(sender, { text: '✅ Antidelete ENABLED', quoted: msg });
                         } else if (option === 'off') {
                             antideleteConfig.enabled = false;
                             saveAntideleteConfig(antideleteConfig);
-                            await socket.sendMessage(sender, {
-                                text: '❌ *Antidelete DISABLED*\n\nDeleted messages will no longer be tracked.\n\n> *CaseyRhodes Bot*',
-                                quoted: msg
-                            });
+                            await socket.sendMessage(sender, { text: '❌ Antidelete DISABLED', quoted: msg });
                         } else {
-                            await socket.sendMessage(sender, {
-                                text: '❌ *Invalid option*\n\nUse `.antidelete on` or `.antidelete off`',
-                                quoted: msg
-                            });
+                            await socket.sendMessage(sender, { text: '❌ Invalid. Use: on or off', quoted: msg });
                         }
                     } catch (error) {
-                        console.error('Antidelete command error:', error);
-                        await socket.sendMessage(sender, {
-                            text: '❌ Error managing antidelete feature.',
-                            quoted: msg
-                        });
+                        console.error('Antidelete error:', error);
+                        await socket.sendMessage(sender, { text: '❌ Error', quoted: msg });
+                    }
+                    break;
+                }
+
+                // Case: welcome
+                case 'welcome': {
+                    try {
+                        if (!isGroup) {
+                            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
+                            break;
+                        }
+                        if (!isSenderGroupAdmin && !isOwner) {
+                            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
+                            break;
+                        }
+                        
+                        const welcomeConfig = loadWelcomeConfig();
+                        if (!welcomeConfig[from]) welcomeConfig[from] = { welcome: true, goodbye: true };
+                        const option = args[0]?.toLowerCase();
+                        
+                        if (!option) {
+                            const status = welcomeConfig[from].welcome ? '✅ ENABLED' : '❌ DISABLED';
+                            await socket.sendMessage(sender, {
+                                text: `*🎉 WELCOME*\n\nStatus: ${status}\n\n.welcome on/off`,
+                                buttons: [
+                                    { buttonId: `${prefix}welcome on`, buttonText: { displayText: '✅ ENABLE' }, type: 1 },
+                                    { buttonId: `${prefix}welcome off`, buttonText: { displayText: '❌ DISABLE' }, type: 1 }
+                                ],
+                                headerType: 1
+                            }, { quoted: msg });
+                            break;
+                        }
+                        
+                        if (option === 'on') {
+                            welcomeConfig[from].welcome = true;
+                            saveWelcomeConfig(welcomeConfig);
+                            await socket.sendMessage(sender, { text: '✅ Welcome enabled', quoted: msg });
+                        } else if (option === 'off') {
+                            welcomeConfig[from].welcome = false;
+                            saveWelcomeConfig(welcomeConfig);
+                            await socket.sendMessage(sender, { text: '❌ Welcome disabled', quoted: msg });
+                        } else {
+                            await socket.sendMessage(sender, { text: '❌ Invalid. Use: on or off', quoted: msg });
+                        }
+                    } catch (error) {
+                        console.error('Welcome error:', error);
+                        await socket.sendMessage(sender, { text: '❌ Error', quoted: msg });
+                    }
+                    break;
+                }
+
+                // Case: goodbye
+                case 'goodbye': {
+                    try {
+                        if (!isGroup) {
+                            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
+                            break;
+                        }
+                        if (!isSenderGroupAdmin && !isOwner) {
+                            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
+                            break;
+                        }
+                        
+                        const welcomeConfig = loadWelcomeConfig();
+                        if (!welcomeConfig[from]) welcomeConfig[from] = { welcome: true, goodbye: true };
+                        const option = args[0]?.toLowerCase();
+                        
+                        if (!option) {
+                            const status = welcomeConfig[from].goodbye ? '✅ ENABLED' : '❌ DISABLED';
+                            await socket.sendMessage(sender, {
+                                text: `*👋 GOODBYE*\n\nStatus: ${status}\n\n.goodbye on/off`,
+                                buttons: [
+                                    { buttonId: `${prefix}goodbye on`, buttonText: { displayText: '✅ ENABLE' }, type: 1 },
+                                    { buttonId: `${prefix}goodbye off`, buttonText: { displayText: '❌ DISABLE' }, type: 1 }
+                                ],
+                                headerType: 1
+                            }, { quoted: msg });
+                            break;
+                        }
+                        
+                        if (option === 'on') {
+                            welcomeConfig[from].goodbye = true;
+                            saveWelcomeConfig(welcomeConfig);
+                            await socket.sendMessage(sender, { text: '✅ Goodbye enabled', quoted: msg });
+                        } else if (option === 'off') {
+                            welcomeConfig[from].goodbye = false;
+                            saveWelcomeConfig(welcomeConfig);
+                            await socket.sendMessage(sender, { text: '❌ Goodbye disabled', quoted: msg });
+                        } else {
+                            await socket.sendMessage(sender, { text: '❌ Invalid. Use: on or off', quoted: msg });
+                        }
+                    } catch (error) {
+                        console.error('Goodbye error:', error);
+                        await socket.sendMessage(sender, { text: '❌ Error', quoted: msg });
+                    }
+                    break;
+                }
+
+                // Case: setwelcome
+                case 'setwelcome': {
+                    try {
+                        if (!isGroup) {
+                            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
+                            break;
+                        }
+                        if (!isSenderGroupAdmin && !isOwner) {
+                            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
+                            break;
+                        }
+                        
+                        const customMessage = args.join(' ');
+                        if (!customMessage) {
+                            await socket.sendMessage(sender, {
+                                text: `📝 *Set Welcome*\n\n.setwelcome Your message\n\n{name} - Member name\n{group} - Group name\n{count} - Member count`,
+                                quoted: msg
+                            });
+                            break;
+                        }
+                        
+                        const welcomeConfig = loadWelcomeConfig();
+                        if (!welcomeConfig[from]) welcomeConfig[from] = { welcome: true, goodbye: true };
+                        welcomeConfig[from].welcome_message = customMessage;
+                        saveWelcomeConfig(welcomeConfig);
+                        
+                        await socket.sendMessage(sender, { text: '✅ Welcome message saved!', quoted: msg });
+                    } catch (error) {
+                        console.error('Setwelcome error:', error);
+                        await socket.sendMessage(sender, { text: '❌ Error', quoted: msg });
+                    }
+                    break;
+                }
+
+                // Case: setgoodbye
+                case 'setgoodbye': {
+                    try {
+                        if (!isGroup) {
+                            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
+                            break;
+                        }
+                        if (!isSenderGroupAdmin && !isOwner) {
+                            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
+                            break;
+                        }
+                        
+                        const customMessage = args.join(' ');
+                        if (!customMessage) {
+                            await socket.sendMessage(sender, {
+                                text: `📝 *Set Goodbye*\n\n.setgoodbye Your message\n\n{name} - Member name\n{group} - Group name`,
+                                quoted: msg
+                            });
+                            break;
+                        }
+                        
+                        const welcomeConfig = loadWelcomeConfig();
+                        if (!welcomeConfig[from]) welcomeConfig[from] = { welcome: true, goodbye: true };
+                        welcomeConfig[from].goodbye_message = customMessage;
+                        saveWelcomeConfig(welcomeConfig);
+                        
+                        await socket.sendMessage(sender, { text: '✅ Goodbye message saved!', quoted: msg });
+                    } catch (error) {
+                        console.error('Setgoodbye error:', error);
+                        await socket.sendMessage(sender, { text: '❌ Error', quoted: msg });
                     }
                     break;
                 }
