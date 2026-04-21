@@ -909,325 +909,6 @@ function setupCommandHandlers(socket, number) {
                     break;
                 }
 
-
-             // Case: welcome
-case 'welcome': {
-    try {
-        if (!isGroup) {
-            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
-            break;
-        }
-        if (!isSenderGroupAdmin && !isOwner) {
-            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
-            break;
-        }
-        
-        const welcomeConfig = loadWelcomeConfig();
-        if (!welcomeConfig[from]) {
-            welcomeConfig[from] = { welcome: true, goodbye: true };
-        }
-        const option = args[0]?.toLowerCase();
-        
-        if (!option) {
-            const status = welcomeConfig[from].welcome ? '✅ ENABLED' : '❌ DISABLED';
-            await socket.sendMessage(sender, {
-                text: `*🎉 WELCOME MESSAGES*\n\n┏━━━━━━━━━━━━━━━━━━┓\n┃ 📌 Status: ${status}\n┗━━━━━━━━━━━━━━━━━━┛\n\nUse .welcome on/off to toggle`,
-                buttons: [
-                    {
-                        buttonId: `${prefix}welcome on`,
-                        buttonText: { displayText: '✅ ENABLE' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${prefix}welcome off`,
-                        buttonText: { displayText: '❌ DISABLE' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${prefix}setwelcome`,
-                        buttonText: { displayText: '📝 CUSTOM' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-            break;
-        }
-        
-        if (option === 'on') {
-            welcomeConfig[from].welcome = true;
-            saveWelcomeConfig(welcomeConfig);
-            await socket.sendMessage(sender, {
-                text: '✅ *Welcome messages ENABLED*\n\nNew members will be greeted automatically.',
-                buttons: [
-                    {
-                        buttonId: `${prefix}setwelcome`,
-                        buttonText: { displayText: '📝 CUSTOM MESSAGE' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${prefix}welcome off`,
-                        buttonText: { displayText: '❌ DISABLE' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-        } else if (option === 'off') {
-            welcomeConfig[from].welcome = false;
-            saveWelcomeConfig(welcomeConfig);
-            await socket.sendMessage(sender, {
-                text: '❌ *Welcome messages DISABLED*\n\nNew members will not be greeted.',
-                buttons: [
-                    {
-                        buttonId: `${prefix}welcome on`,
-                        buttonText: { displayText: '✅ ENABLE' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-        } else {
-            await socket.sendMessage(sender, {
-                text: '❌ *Invalid option*\n\nUse: .welcome on or .welcome off',
-                buttons: [
-                    {
-                        buttonId: `${prefix}welcome on`,
-                        buttonText: { displayText: '✅ ENABLE' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${prefix}welcome off`,
-                        buttonText: { displayText: '❌ DISABLE' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-        }
-    } catch (error) {
-        console.error('Welcome error:', error);
-        await socket.sendMessage(sender, { text: '❌ Error: ' + error.message, quoted: msg });
-    }
-    break;
-}
-
-// Case: goodbye
-case 'goodbye': {
-    try {
-        if (!isGroup) {
-            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
-            break;
-        }
-        if (!isSenderGroupAdmin && !isOwner) {
-            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
-            break;
-        }
-        
-        const welcomeConfig = loadWelcomeConfig();
-        if (!welcomeConfig[from]) {
-            welcomeConfig[from] = { welcome: true, goodbye: true };
-        }
-        const option = args[0]?.toLowerCase();
-        
-        if (!option) {
-            const status = welcomeConfig[from].goodbye ? '✅ ENABLED' : '❌ DISABLED';
-            await socket.sendMessage(sender, {
-                text: `*👋 GOODBYE MESSAGES*\n\n┏━━━━━━━━━━━━━━━━━━┓\n┃ 📌 Status: ${status}\n┗━━━━━━━━━━━━━━━━━━┛\n\nUse .goodbye on/off to toggle`,
-                buttons: [
-                    {
-                        buttonId: `${prefix}goodbye on`,
-                        buttonText: { displayText: '✅ ENABLE' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${prefix}goodbye off`,
-                        buttonText: { displayText: '❌ DISABLE' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${prefix}setgoodbye`,
-                        buttonText: { displayText: '📝 CUSTOM' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-            break;
-        }
-        
-        if (option === 'on') {
-            welcomeConfig[from].goodbye = true;
-            saveWelcomeConfig(welcomeConfig);
-            await socket.sendMessage(sender, {
-                text: '✅ *Goodbye messages ENABLED*\n\nLeaving members will be noticed.',
-                buttons: [
-                    {
-                        buttonId: `${prefix}setgoodbye`,
-                        buttonText: { displayText: '📝 CUSTOM MESSAGE' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${prefix}goodbye off`,
-                        buttonText: { displayText: '❌ DISABLE' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-        } else if (option === 'off') {
-            welcomeConfig[from].goodbye = false;
-            saveWelcomeConfig(welcomeConfig);
-            await socket.sendMessage(sender, {
-                text: '❌ *Goodbye messages DISABLED*\n\nLeaving members will not be noticed.',
-                buttons: [
-                    {
-                        buttonId: `${prefix}goodbye on`,
-                        buttonText: { displayText: '✅ ENABLE' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-        } else {
-            await socket.sendMessage(sender, {
-                text: '❌ *Invalid option*\n\nUse: .goodbye on or .goodbye off',
-                buttons: [
-                    {
-                        buttonId: `${prefix}goodbye on`,
-                        buttonText: { displayText: '✅ ENABLE' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${prefix}goodbye off`,
-                        buttonText: { displayText: '❌ DISABLE' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-        }
-    } catch (error) {
-        console.error('Goodbye error:', error);
-        await socket.sendMessage(sender, { text: '❌ Error: ' + error.message, quoted: msg });
-    }
-    break;
-}
-
-// Case: setwelcome
-case 'setwelcome': {
-    try {
-        if (!isGroup) {
-            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
-            break;
-        }
-        if (!isSenderGroupAdmin && !isOwner) {
-            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
-            break;
-        }
-        
-        const customMessage = args.join(' ');
-        if (!customMessage) {
-            await socket.sendMessage(sender, {
-                text: `📝 *SET WELCOME MESSAGE*\n\n┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n┃ Usage: .setwelcome Your message\n┃\n┃ Placeholders:\n┃ {name} - Member name\n┃ {group} - Group name\n┃ {count} - Member count\n┃\n┃ Example:\n┃ .setwelcome Welcome {name}!\n┗━━━━━━━━━━━━━━━━━━━━━━━━┛`,
-                buttons: [
-                    {
-                        buttonId: `${prefix}welcome`,
-                        buttonText: { displayText: '🔙 BACK' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-            break;
-        }
-        
-        const welcomeConfig = loadWelcomeConfig();
-        if (!welcomeConfig[from]) {
-            welcomeConfig[from] = { welcome: true, goodbye: true };
-        }
-        welcomeConfig[from].welcome_message = customMessage;
-        saveWelcomeConfig(welcomeConfig);
-        
-        const preview = customMessage
-            .replace(/{name}/g, 'User')
-            .replace(/{group}/g, from.split('@')[0])
-            .replace(/{count}/g, '10');
-        
-        await socket.sendMessage(sender, {
-            text: `✅ *Welcome message saved!*\n\n📝 Preview:\n${preview}`,
-            buttons: [
-                {
-                    buttonId: `${prefix}welcome`,
-                    buttonText: { displayText: '🔙 BACK TO WELCOME' },
-                    type: 1
-                }
-            ],
-            headerType: 1
-        }, { quoted: msg });
-    } catch (error) {
-        console.error('Setwelcome error:', error);
-        await socket.sendMessage(sender, { text: '❌ Error: ' + error.message, quoted: msg });
-    }
-    break;
-}
-
-// Case: setgoodbye
-case 'setgoodbye': {
-    try {
-        if (!isGroup) {
-            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
-            break;
-        }
-        if (!isSenderGroupAdmin && !isOwner) {
-            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
-            break;
-        }
-        
-        const customMessage = args.join(' ');
-        if (!customMessage) {
-            await socket.sendMessage(sender, {
-                text: `📝 *SET GOODBYE MESSAGE*\n\n┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n┃ Usage: .setgoodbye Your message\n┃\n┃ Placeholders:\n┃ {name} - Member name\n┃ {group} - Group name\n┃\n┃ Example:\n┃ .setgoodbye Goodbye {name}!\n┗━━━━━━━━━━━━━━━━━━━━━━━━┛`,
-                buttons: [
-                    {
-                        buttonId: `${prefix}goodbye`,
-                        buttonText: { displayText: '🔙 BACK' },
-                        type: 1
-                    }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-            break;
-        }
-        
-        const welcomeConfig = loadWelcomeConfig();
-        if (!welcomeConfig[from]) {
-            welcomeConfig[from] = { welcome: true, goodbye: true };
-        }
-        welcomeConfig[from].goodbye_message = customMessage;
-        saveWelcomeConfig(welcomeConfig);
-        
-        const preview = customMessage
-            .replace(/{name}/g, 'User')
-            .replace(/{group}/g, from.split('@')[0]);
-        
-        await socket.sendMessage(sender, {
-            text: `✅ *Goodbye message saved!*\n\n📝 Preview:\n${preview}`,
-            buttons: [
-                {
-                    buttonId: `${prefix}goodbye`,
-                    buttonText: { displayText: '🔙 BACK TO GOODBYE' },
-                    type: 1
-                }
-            ],
-            headerType: 1
-        }, { quoted: msg });
-    } catch (error) {
-        console.error('Setgoodbye error:', error);
-        await socket.sendMessage(sender, { text: '❌ Error: ' + error.message, quoted: msg });
-    }
-    break;
-}
                 // Case: mode
 case 'mode':
 case 'botmode':
@@ -2189,12 +1870,12 @@ case 'menu': {
                   title: "🌐 ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs",
                   highlight_label: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ',
                   rows: [
-                    { title: "📜 ᴀʟʟᴍᴇɴᴜ", description: "get all command in lidt", id: `${config.PREFIX}allmenu` }, 
-                    { title: "🎨 ʟᴏɢᴏ ᴍᴇɴᴜ", description: "get yoir own logo texts", id: `${config.PREFIX}logomenu` }, 
+                    { title: "📜 ᴀʟʟᴍᴇɴᴜ", description: "get all command in list", id: `${config.PREFIX}allmenu` }, 
+                    { title: "🎨 ʟᴏɢᴏ ᴍᴇɴᴜ", description: "get your own logo texts", id: `${config.PREFIX}logomenu` }, 
                     { title: "🟢 ᴀʟɪᴠᴇ", description: "Check if bot is active", id: `${config.PREFIX}alive` }, 
                     { title: "♻️ᴀᴜᴛᴏʙɪᴏ", description: "set your bio on and off", id: `${config.PREFIX}autobio` },
-                    { title: "🪀MODE", description: "st yoir bot public or private", id: `${config.PREFIX}mode` },    
-                    { title: "🌟owner", description: "get intouch with dev", id: `${config.PREFIX}owner` },
+                    { title: "🪀MODE", description: "set your bot public or private", id: `${config.PREFIX}mode` },    
+                    { title: "🌟owner", description: "get in touch with dev", id: `${config.PREFIX}owner` },
                     { title: "🎭ʜᴀᴄᴋ", description: "prank others", id: `${config.PREFIX}hack` },
                     { title: "🗣️ᴄᴀʟᴄᴜʟᴀᴛᴏʀ", description: "do your own math", id: `${config.PREFIX}calculator` },
                     { title: "📊 ʙᴏᴛ sᴛᴀᴛs", description: "View bot statistics", id: `${config.PREFIX}session` },
@@ -2203,7 +1884,7 @@ case 'menu': {
                     { title: "📋 ᴍᴇɴᴜ", description: "Show this menu", id: `${config.PREFIX}menu` },
                     { title: "📜 ϙᴜʀᴀɴ", description: "List all your quran by number", id: `${config.PREFIX}quran` },
                     { title: "🔮sᴄʀᴇᴇɴsʜᴏᴏᴛ", description: "get website screenshots", id: `${config.PREFIX}ss` },
-                    { title: "💌ғᴇᴛᴄʜ", description: "get url comtent", id: `${config.PREFIX}get` },  
+                    { title: "💌ғᴇᴛᴄʜ", description: "get url content", id: `${config.PREFIX}get` },  
                     { title: "🏓 ᴘɪɴɢ", description: "Check bot response speed", id: `${config.PREFIX}ping` },
                     { title: "📜 ᴘᴅғ", description: "change text to pdf", id: `${config.PREFIX}pdf` },
                     { title: "🔗 ᴘᴀɪʀ", description: "Generate pairing code", id: `${config.PREFIX}pair` },
@@ -2224,13 +1905,13 @@ case 'menu': {
                     { title: "📱 ᴛɪᴋᴛᴏᴋ", description: "Download TikTok videos", id: `${config.PREFIX}tiktok` },
                     { title: "💠ᴊɪᴅ", description:"get your own jid", id: `${config.PREFIX}jid` },
                     { title: "📘 ғᴀᴄᴇʙᴏᴏᴋ", description: "Download Facebook content", id: `${config.PREFIX}fb` },
-                    { title: "🎀ʙɪʙʟᴇ", description: "okoka😂", id: `${config.PREFIX}bible` },
+                    { title: "🎀ʙɪʙʟᴇ", description: "bible verses", id: `${config.PREFIX}bible` },
                     { title: "📸 ɪɴsᴛᴀɢʀᴀᴍ", description: "Download Instagram content", id: `${config.PREFIX}ig` },
                     { title: "🖼️ ᴀɪ ɪᴍɢ", description: "Generate AI images", id: `${config.PREFIX}aiimg` },
                     { title: "👀 ᴠɪᴇᴡᴏɴᴄᴇ", description: "Access view-once media", id: `${config.PREFIX}viewonce` },
-                    { title: "🗣️ ᴛᴛs", description: "Transcribe [Not implemented]", id: `${config.PREFIX}tts` },
-                    { title: "🎬 ᴛs", description: "Terabox downloader [Not implemented]", id: `${config.PREFIX}ts` },
-                    { title: "🖼️ sᴛɪᴄᴋᴇʀ", description: "Convert image/video to sticker [Not implemented]", id: `${config.PREFIX}sticker` }
+                    { title: "🗣️ ᴛᴛs", description: "Text to speech", id: `${config.PREFIX}tts` },
+                    { title: "🎬 ᴛs", description: "Terabox downloader", id: `${config.PREFIX}ts` },
+                    { title: "🖼️ sᴛɪᴄᴋᴇʀ", description: "Convert image/video to sticker", id: `${config.PREFIX}sticker` }
                   ]
                 },
                 {
@@ -2254,7 +1935,7 @@ case 'menu': {
                     { title: "🚀 ɴᴀsᴀ", description: "NASA space updates", id: `${config.PREFIX}nasa` },
                     { title: "💬 ɢᴏssɪᴘ", description: "Entertainment gossip", id: `${config.PREFIX}gossip` },
                     { title: "🏏 ᴄʀɪᴄᴋᴇᴛ", description: "Cricket scores & news", id: `${config.PREFIX}cricket` },
-                    { title: "🎭 ᴀɴᴏɴʏᴍᴏᴜs", description: "Fun interaction [Not implemented]", id: `${config.PREFIX}anonymous` }
+                    { title: "🎭 ᴀɴᴏɴʏᴍᴏᴜs", description: "Fun interaction", id: `${config.PREFIX}anonymous` }
                   ]
                 },
                 {
@@ -2278,17 +1959,16 @@ case 'menu': {
                   title: "🔧 ᴛᴏᴏʟs & ᴜᴛɪʟɪᴛɪᴇs",
                   rows: [
                     { title: "🤖 ᴀɪ", description: "Chat with AI assistant", id: `${config.PREFIX}ai` },
-                    { title: "🚫ʙʟᴏᴄᴋ", description: "block", id: `${config.PREFIX}block` },
+                    { title: "🚫ʙʟᴏᴄᴋ", description: "block user", id: `${config.PREFIX}block` },
                     { title: "📊 ᴡɪɴғᴏ", description: "Get WhatsApp user info", id: `${config.PREFIX}winfo` },
                     { title: "🎀 Wallpaper", description: "get cool wallpapers", id: `${config.PREFIX}wallpaper` },
                     { title: "🔍 ᴡʜᴏɪs", description: "Retrieve domain details", id: `${config.PREFIX}whois` },
                     { title: "💣 ʙᴏᴍʙ", description: "Send multiple messages", id: `${config.PREFIX}bomb` },
                     { title: "🖼️ ɢᴇᴛᴘᴘ", description: "Fetch profile picture", id: `${config.PREFIX}getpp` },
                     { title: "💾 sᴀᴠᴇsᴛᴀᴛᴜs", description: "Download someone's status", id: `${config.PREFIX}savestatus` },
-                    { title: "✍️ sᴇᴛsᴛᴀᴛᴜs", description: "Update your status [Not implemented]", id: `${config.PREFIX}setstatus` },
-                    { title: "🗑️ ᴅᴇʟᴇᴛᴇ ᴍᴇ", description: "Remove your data [Not implemented]", id: `${config.PREFIX}d` },
+                    { title: "✍️ sᴇᴛsᴛᴀᴛᴜs", description: "Update your status", id: `${config.PREFIX}setstatus` },
                     { title: "🌦️ ᴡᴇᴀᴛʜᴇʀ", description: "Get weather forecast", id: `${config.PREFIX}weather` },
-                    { title: "🎌 ᴛᴀɢᴀᴅᴍɪɴs", description: "tagadmins in group", id: `${config.PREFIX}tagadmins` },
+                    { title: "🎌 ᴛᴀɢᴀᴅᴍɪɴs", description: "tag admins in group", id: `${config.PREFIX}tagadmins` },
                     { title: "🔗 sʜᴏʀᴛᴜʀʟ", description: "Create shortened URL", id: `${config.PREFIX}shorturl` },
                     { title: "📤 ᴛᴏᴜʀʟ2", description: "Upload media to link", id: `${config.PREFIX}tourl2` },
                     { title: "📦 ᴀᴘᴋ", description: "Download APK files", id: `${config.PREFIX}apk` },   
@@ -2310,38 +1990,87 @@ case 'menu': {
     // Send menu first
     await socket.sendMessage(from, menuMessage, { quoted: fakevCard });
     
-    // FIXED: Proper audio sending for latest Baileys
-    // Download audio buffer first for reliable playback
+    // FIXED: Download and convert audio properly for WhatsApp
     try {
         const audioUrl = 'https://files.catbox.moe/8rj7xf.mp3';
-        const audioResponse = await fetch(audioUrl);
-        const audioBuffer = await audioResponse.buffer();
+        console.log('📥 Downloading audio from:', audioUrl);
         
-        // Send as voice note (PTT)
+        // Download audio with proper headers
+        const audioResponse = await axios({
+            method: 'get',
+            url: audioUrl,
+            responseType: 'arraybuffer',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+        
+        const audioBuffer = Buffer.from(audioResponse.data);
+        console.log('📦 Audio downloaded, size:', audioBuffer.length, 'bytes');
+        
+        // Convert to proper WhatsApp voice note format using ffmpeg
+        const tempInputPath = path.join(TEMP_MEDIA_DIR, `input_${Date.now()}.mp3`);
+        const tempOutputPath = path.join(TEMP_MEDIA_DIR, `output_${Date.now()}.opus`);
+        
+        // Write temp file
+        await writeFile(tempInputPath, audioBuffer);
+        
+        // Convert to opus format (WhatsApp voice note format)
+        await new Promise((resolve, reject) => {
+            ffmpeg(tempInputPath)
+                .audioCodec('libopus')
+                .audioBitrate('32k')
+                .audioChannels(1)
+                .audioFrequency(16000)
+                .format('opus')
+                .on('end', resolve)
+                .on('error', reject)
+                .save(tempOutputPath);
+        });
+        
+        // Read converted file
+        const convertedBuffer = await fs.readFile(tempOutputPath);
+        console.log('✅ Audio converted, new size:', convertedBuffer.length, 'bytes');
+        
+        // Send as voice note
         await socket.sendMessage(from, {
-            audio: audioBuffer,
-            mimetype: 'audio/mp4',
-            ptt: true,
-            waveform: generateWaveform(audioBuffer), // Add waveform for better UX
-            contextInfo: messageContext
+            audio: convertedBuffer,
+            mimetype: 'audio/ogg; codecs=opus',
+            ptt: true
         }, { quoted: fakevCard });
         
-        console.log('✅ Audio sent successfully');
+        console.log('✅ Voice note sent successfully');
+        
+        // Clean up temp files
+        try { fs.unlinkSync(tempInputPath); } catch {}
+        try { fs.unlinkSync(tempOutputPath); } catch {}
+        
     } catch (audioError) {
-        console.error('Audio send error:', audioError);
-        // Fallback: Try sending with URL
+        console.error('❌ Audio processing error:', audioError.message);
+        
+        // Fallback 1: Try sending as regular audio (not voice note)
         try {
+            console.log('🔄 Trying fallback: Send as regular audio');
+            const audioResponse = await axios({
+                method: 'get',
+                url: 'https://files.catbox.moe/8rj7xf.mp3',
+                responseType: 'arraybuffer'
+            });
+            
             await socket.sendMessage(from, {
-                audio: { url: 'https://files.catbox.moe/8rj7xf.mp3' },
+                audio: Buffer.from(audioResponse.data),
                 mimetype: 'audio/mpeg',
-                ptt: true
+                ptt: false,
+                fileName: 'caseyrhodes_menu.mp3'
             }, { quoted: fakevCard });
+            console.log('✅ Regular audio sent');
         } catch (fallbackError) {
-            console.error('Audio fallback error:', fallbackError);
+            console.error('❌ All audio methods failed:', fallbackError.message);
         }
     }
     
     await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    
   } catch (error) {
     console.error('Menu command error:', error);
     const usedMemory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
@@ -2366,8 +2095,7 @@ ${config.PREFIX}allmenu ᴛᴏ ᴠɪᴇᴡ ᴀʟʟ ᴄᴍᴅs
 
     await socket.sendMessage(from, {
       image: { url: "https://i.ibb.co/fGSVG8vJ/caseyweb.jpg" },
-      caption: fallbackMenuText,
-      contextInfo: messageContext
+      caption: fallbackMenuText
     }, { quoted: fakevCard });
     await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
   }
