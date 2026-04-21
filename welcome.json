@@ -1,1 +1,13 @@
-
+{
+  "1234567890@g.us": {
+    "welcome": true,
+    "goodbye": true,
+    "welcome_message": "🎉 *WELCOME!* 🎉\n\nHello @{name},\nWelcome to *{group}*!\n\n📌 Be respectful & enjoy!",
+    "goodbye_message": "👋 *GOODBYE!* 👋\n\n@{name} has left the group.\n\nWe wish you all the best!"
+  },
+  "0987654321@g.us": {
+    "welcome": false,
+    "goodbye": true,
+    "welcome_message": "Welcome {name} to {group}! We have {count} members now!"
+  }
+}
