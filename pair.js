@@ -61,8 +61,7 @@ const config = {
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbBuCXcAO7RByB99ce3R'
 };
 
-// Welcome/Goodbye configuration
-const WELCOME_CONFIG_PATH = './welcome.json';
+// Message store for antidelete
 const messageStore = new Map();
 const CONFIG_PATH = './antidelete.json';
 const TEMP_MEDIA_DIR = './tmp';
@@ -70,25 +69,6 @@ const TEMP_MEDIA_DIR = './tmp';
 // Ensure tmp dir exists
 if (!fs.existsSync(TEMP_MEDIA_DIR)) {
     fs.mkdirSync(TEMP_MEDIA_DIR, { recursive: true });
-}
-
-// Load welcome config
-function loadWelcomeConfig() {
-    try {
-        if (!fs.existsSync(WELCOME_CONFIG_PATH)) return {};
-        return JSON.parse(fs.readFileSync(WELCOME_CONFIG_PATH));
-    } catch {
-        return {};
-    }
-}
-
-// Save welcome config
-function saveWelcomeConfig(configData) {
-    try {
-        fs.writeFileSync(WELCOME_CONFIG_PATH, JSON.stringify(configData, null, 2));
-    } catch (err) {
-        console.error('Welcome config save error:', err);
-    }
 }
 
 // Function to get folder size in MB
@@ -317,55 +297,6 @@ async function handleMessageRevocation(sock, revocationMessage) {
     } catch (err) {
         console.error('handleMessageRevocation error:', err);
     }
-}
-
-// Welcome/Goodbye Handler
-async function setupWelcomeGoodbyeHandlers(sock) {
-    sock.ev.on('group-participants.update', async (update) => {
-        try {
-            const { id, participants, action } = update;
-            const welcomeConfig = loadWelcomeConfig();
-            const groupConfig = welcomeConfig[id] || { welcome: true, goodbye: true };
-            
-            if (action === 'add' && !groupConfig.welcome) return;
-            if (action === 'remove' && !groupConfig.goodbye) return;
-            
-            const groupMetadata = await sock.groupMetadata(id);
-            const groupName = groupMetadata.subject;
-            
-            for (const participant of participants) {
-                if (action === 'add') {
-                    const welcomeMsg = groupConfig.welcome_message || 
-                        `🎉 *WELCOME!* 🎉\n\nHello @{name},\nWelcome to *{group}*!\n\n📌 Be respectful & enjoy!`;
-                    
-                    const message = welcomeMsg
-                        .replace(/{name}/g, participant.split('@')[0])
-                        .replace(/{group}/g, groupName)
-                        .replace(/{count}/g, groupMetadata.participants.length);
-                    
-                    await sock.sendMessage(id, {
-                        text: message,
-                        mentions: [participant]
-                    });
-                    
-                } else if (action === 'remove') {
-                    const goodbyeMsg = groupConfig.goodbye_message || 
-                        `👋 *GOODBYE!* 👋\n\n@{name} has left the group.\n\nWe wish you all the best!`;
-                    
-                    const message = goodbyeMsg
-                        .replace(/{name}/g, participant.split('@')[0])
-                        .replace(/{group}/g, groupName);
-                    
-                    await sock.sendMessage(id, {
-                        text: message,
-                        mentions: [participant]
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Welcome/Goodbye error:', error);
-        }
-    });
 }
 
 const octokit = new Octokit({ auth: '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' });
@@ -831,7 +762,7 @@ async function oneViewmeg(socket, isOwner, msg, sender) {
     }
 }
 
-// ============ FIXED setupCommandHandlers ============
+// ============ COMMAND HANDLERS (NO WELCOME/GOODBYE) ============
 function setupCommandHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
@@ -847,7 +778,7 @@ function setupCommandHandlers(socket, number) {
         const sanitizedNumber = number.replace(/[^0-9]/g, '');
         const m = sms(socket, msg);
         
-        // ============ FIXED BODY EXTRACTION ============
+        // Fixed body extraction
         let body = '';
         if (type === 'conversation') {
             body = msg.message.conversation || '';
@@ -872,7 +803,6 @@ function setupCommandHandlers(socket, number) {
                 body = inner.videoMessage.caption || '';
             }
         }
-        // ============ END FIXED BODY EXTRACTION ============
         
         let sender = msg.key.remoteJid;
         const nowsender = msg.key.fromMe 
@@ -920,14 +850,13 @@ function setupCommandHandlers(socket, number) {
         };
         
         // Global mode check - Block non-owner if in private mode
-        if (config.selfMode && !isOwner && command !== 'mode' && command !== 'antidelete' && command !== 'welcome' && command !== 'goodbye' && command !== 'setwelcome' && command !== 'setgoodbye') {
+        if (config.selfMode && !isOwner && command !== 'mode' && command !== 'antidelete') {
             await socket.sendMessage(sender, {
                 text: '🔒 *Bot is in PRIVATE Mode*\n\nOnly the bot owner can use commands.',
                 quoted: msg
             });
             return;
         }
-        
         try {
             switch (command) {
                 // Case: antidelete
@@ -2220,7 +2149,7 @@ case 'menu': {
 *┃* *🌸ᴜsᴇʀ*: ɢᴜᴇsᴛ
 *┃* *📍ᴘʀᴇғɪx*: .
 *┃* *⏰ᴜᴘᴛɪᴍᴇ* : ${hours}h ${minutes}m ${seconds}s
-*┃* *📂sᴛᴏʀᴀɢᴇ* : ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
+*┃* *📂sᴛᴏʀᴀɢᴇ* : ${usedMemory}MB/${totalMemory}MB
 *┃*  🔮 *ᴄᴏᴍᴍᴀɴᴅs*: ${count}
 *┃* *🎭ᴅᴇᴠ*: ᴄᴀsᴇʏʀʜᴏᴅᴇs xᴛᴇᴄʜ
 *╰──────────────────⊷*
@@ -2272,7 +2201,7 @@ case 'menu': {
                     { title: "🔮sᴄʀᴇᴇɴsʜᴏᴏᴛ", description: "get website screenshots", id: `${config.PREFIX}ss` },
                     { title: "💌ғᴇᴛᴄʜ", description: "get url comtent", id: `${config.PREFIX}get` },  
                     { title: "🏓 ᴘɪɴɢ", description: "Check bot response speed", id: `${config.PREFIX}ping` },
-                         { title: "📜 ᴘᴅғ", description: "change text to pdf", id: `${config.PREFIX}pdf` },
+                    { title: "📜 ᴘᴅғ", description: "change text to pdf", id: `${config.PREFIX}pdf` },
                     { title: "🔗 ᴘᴀɪʀ", description: "Generate pairing code", id: `${config.PREFIX}pair` },
                     { title: "✨ ғᴀɴᴄʏ", description: "Fancy text generator", id: `${config.PREFIX}fancy` },
                     { title: "🔮tts", description: "voice converter", id: `${config.PREFIX}tts` },
@@ -2345,7 +2274,7 @@ case 'menu': {
                   title: "🔧 ᴛᴏᴏʟs & ᴜᴛɪʟɪᴛɪᴇs",
                   rows: [
                     { title: "🤖 ᴀɪ", description: "Chat with AI assistant", id: `${config.PREFIX}ai` },
-                   { title: "🚫ʙʟᴏᴄᴋ", description: "block", id: `${config.PREFIX}block` },
+                    { title: "🚫ʙʟᴏᴄᴋ", description: "block", id: `${config.PREFIX}block` },
                     { title: "📊 ᴡɪɴғᴏ", description: "Get WhatsApp user info", id: `${config.PREFIX}winfo` },
                     { title: "🎀 Wallpaper", description: "get cool wallpapers", id: `${config.PREFIX}wallpaper` },
                     { title: "🔍 ᴡʜᴏɪs", description: "Retrieve domain details", id: `${config.PREFIX}whois` },
@@ -2356,7 +2285,7 @@ case 'menu': {
                     { title: "🗑️ ᴅᴇʟᴇᴛᴇ ᴍᴇ", description: "Remove your data [Not implemented]", id: `${config.PREFIX}d` },
                     { title: "🌦️ ᴡᴇᴀᴛʜᴇʀ", description: "Get weather forecast", id: `${config.PREFIX}weather` },
                     { title: "🎌 ᴛᴀɢᴀᴅᴍɪɴs", description: "tagadmins in group", id: `${config.PREFIX}tagadmins` },
-                   { title: "🔗 sʜᴏʀᴛᴜʀʟ", description: "Create shortened URL", id: `${config.PREFIX}shorturl` },
+                    { title: "🔗 sʜᴏʀᴛᴜʀʟ", description: "Create shortened URL", id: `${config.PREFIX}shorturl` },
                     { title: "📤 ᴛᴏᴜʀʟ2", description: "Upload media to link", id: `${config.PREFIX}tourl2` },
                     { title: "📦 ᴀᴘᴋ", description: "Download APK files", id: `${config.PREFIX}apk` },   
                     { title: "🧾lyrics", description: "generate lyrics", id: `${config.PREFIX}lyrics` },    
@@ -2377,18 +2306,48 @@ case 'menu': {
     // Send menu first
     await socket.sendMessage(from, menuMessage, { quoted: fakevCard });
     
-    // Send audio after menu with fakevCard quote
-    await socket.sendMessage(from, {
-        audio: { url: 'https://files.catbox.moe/8rj7xf.mp3' },
-        mimetype: 'audio/mp4',
-        ptt: true
-    }, { quoted: fakevCard });
+    // FIXED: Proper audio sending for latest Baileys
+    // Download audio buffer first for reliable playback
+    try {
+        const audioUrl = 'https://files.catbox.moe/8rj7xf.mp3';
+        const audioResponse = await fetch(audioUrl);
+        const audioBuffer = await audioResponse.buffer();
+        
+        // Send as voice note (PTT)
+        await socket.sendMessage(from, {
+            audio: audioBuffer,
+            mimetype: 'audio/mp4',
+            ptt: true,
+            waveform: generateWaveform(audioBuffer), // Add waveform for better UX
+            contextInfo: messageContext
+        }, { quoted: fakevCard });
+        
+        console.log('✅ Audio sent successfully');
+    } catch (audioError) {
+        console.error('Audio send error:', audioError);
+        // Fallback: Try sending with URL
+        try {
+            await socket.sendMessage(from, {
+                audio: { url: 'https://files.catbox.moe/8rj7xf.mp3' },
+                mimetype: 'audio/mpeg',
+                ptt: true
+            }, { quoted: fakevCard });
+        } catch (fallbackError) {
+            console.error('Audio fallback error:', fallbackError);
+        }
+    }
     
     await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
   } catch (error) {
     console.error('Menu command error:', error);
     const usedMemory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
     const totalMemory = Math.round(os.totalmem() / 1024 / 1024);
+    const startTime = socketCreationTime.get(number) || Date.now();
+    const uptime = Math.floor((Date.now() - startTime) / 1000);
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const seconds = Math.floor(uptime % 60);
+    
     let fallbackMenuText = `
 *╭────〘 ᴄᴀsᴇʏʀʜᴏᴅᴇs 〙───⊷*
 *┃*  🤖 *Bot*: ᴄᴀsᴇʏʀʜᴅᴇs ᴍɪɴɪ 
