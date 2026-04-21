@@ -935,167 +935,324 @@ function setupCommandHandlers(socket, number) {
                     break;
                 }
 
-                // Case: welcome
-                case 'welcome': {
-                    try {
-                        if (!isGroup) {
-                            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
-                            break;
-                        }
-                        if (!isSenderGroupAdmin && !isOwner) {
-                            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
-                            break;
-                        }
-                        
-                        const welcomeConfig = loadWelcomeConfig();
-                        if (!welcomeConfig[from]) welcomeConfig[from] = { welcome: true, goodbye: true };
-                        const option = args[0]?.toLowerCase();
-                        
-                        if (!option) {
-                            const status = welcomeConfig[from].welcome ? '✅ ENABLED' : '❌ DISABLED';
-                            await socket.sendMessage(sender, {
-                                text: `*🎉 WELCOME*\n\nStatus: ${status}\n\n.welcome on/off`,
-                                buttons: [
-                                    { buttonId: `${prefix}welcome on`, buttonText: { displayText: '✅ ENABLE' }, type: 1 },
-                                    { buttonId: `${prefix}welcome off`, buttonText: { displayText: '❌ DISABLE' }, type: 1 }
-                                ],
-                                headerType: 1
-                            }, { quoted: msg });
-                            break;
-                        }
-                        
-                        if (option === 'on') {
-                            welcomeConfig[from].welcome = true;
-                            saveWelcomeConfig(welcomeConfig);
-                            await socket.sendMessage(sender, { text: '✅ Welcome enabled', quoted: msg });
-                        } else if (option === 'off') {
-                            welcomeConfig[from].welcome = false;
-                            saveWelcomeConfig(welcomeConfig);
-                            await socket.sendMessage(sender, { text: '❌ Welcome disabled', quoted: msg });
-                        } else {
-                            await socket.sendMessage(sender, { text: '❌ Invalid. Use: on or off', quoted: msg });
-                        }
-                    } catch (error) {
-                        console.error('Welcome error:', error);
-                        await socket.sendMessage(sender, { text: '❌ Error', quoted: msg });
+             // Case: welcome
+case 'welcome': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
+            break;
+        }
+        if (!isSenderGroupAdmin && !isOwner) {
+            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
+            break;
+        }
+        
+        const welcomeConfig = loadWelcomeConfig();
+        if (!welcomeConfig[from]) {
+            welcomeConfig[from] = { welcome: true, goodbye: true };
+        }
+        const option = args[0]?.toLowerCase();
+        
+        if (!option) {
+            const status = welcomeConfig[from].welcome ? '✅ ENABLED' : '❌ DISABLED';
+            await socket.sendMessage(sender, {
+                text: `*🎉 WELCOME MESSAGES*\n\n┏━━━━━━━━━━━━━━━━━━┓\n┃ 📌 Status: ${status}\n┗━━━━━━━━━━━━━━━━━━┛\n\nUse .welcome on/off to toggle`,
+                buttons: [
+                    {
+                        buttonId: `${prefix}welcome on`,
+                        buttonText: { displayText: '✅ ENABLE' },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}welcome off`,
+                        buttonText: { displayText: '❌ DISABLE' },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}setwelcome`,
+                        buttonText: { displayText: '📝 CUSTOM' },
+                        type: 1
                     }
-                    break;
-                }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+        
+        if (option === 'on') {
+            welcomeConfig[from].welcome = true;
+            saveWelcomeConfig(welcomeConfig);
+            await socket.sendMessage(sender, {
+                text: '✅ *Welcome messages ENABLED*\n\nNew members will be greeted automatically.',
+                buttons: [
+                    {
+                        buttonId: `${prefix}setwelcome`,
+                        buttonText: { displayText: '📝 CUSTOM MESSAGE' },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}welcome off`,
+                        buttonText: { displayText: '❌ DISABLE' },
+                        type: 1
+                    }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        } else if (option === 'off') {
+            welcomeConfig[from].welcome = false;
+            saveWelcomeConfig(welcomeConfig);
+            await socket.sendMessage(sender, {
+                text: '❌ *Welcome messages DISABLED*\n\nNew members will not be greeted.',
+                buttons: [
+                    {
+                        buttonId: `${prefix}welcome on`,
+                        buttonText: { displayText: '✅ ENABLE' },
+                        type: 1
+                    }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        } else {
+            await socket.sendMessage(sender, {
+                text: '❌ *Invalid option*\n\nUse: .welcome on or .welcome off',
+                buttons: [
+                    {
+                        buttonId: `${prefix}welcome on`,
+                        buttonText: { displayText: '✅ ENABLE' },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}welcome off`,
+                        buttonText: { displayText: '❌ DISABLE' },
+                        type: 1
+                    }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        }
+    } catch (error) {
+        console.error('Welcome error:', error);
+        await socket.sendMessage(sender, { text: '❌ Error: ' + error.message, quoted: msg });
+    }
+    break;
+}
 
-                // Case: goodbye
-                case 'goodbye': {
-                    try {
-                        if (!isGroup) {
-                            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
-                            break;
-                        }
-                        if (!isSenderGroupAdmin && !isOwner) {
-                            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
-                            break;
-                        }
-                        
-                        const welcomeConfig = loadWelcomeConfig();
-                        if (!welcomeConfig[from]) welcomeConfig[from] = { welcome: true, goodbye: true };
-                        const option = args[0]?.toLowerCase();
-                        
-                        if (!option) {
-                            const status = welcomeConfig[from].goodbye ? '✅ ENABLED' : '❌ DISABLED';
-                            await socket.sendMessage(sender, {
-                                text: `*👋 GOODBYE*\n\nStatus: ${status}\n\n.goodbye on/off`,
-                                buttons: [
-                                    { buttonId: `${prefix}goodbye on`, buttonText: { displayText: '✅ ENABLE' }, type: 1 },
-                                    { buttonId: `${prefix}goodbye off`, buttonText: { displayText: '❌ DISABLE' }, type: 1 }
-                                ],
-                                headerType: 1
-                            }, { quoted: msg });
-                            break;
-                        }
-                        
-                        if (option === 'on') {
-                            welcomeConfig[from].goodbye = true;
-                            saveWelcomeConfig(welcomeConfig);
-                            await socket.sendMessage(sender, { text: '✅ Goodbye enabled', quoted: msg });
-                        } else if (option === 'off') {
-                            welcomeConfig[from].goodbye = false;
-                            saveWelcomeConfig(welcomeConfig);
-                            await socket.sendMessage(sender, { text: '❌ Goodbye disabled', quoted: msg });
-                        } else {
-                            await socket.sendMessage(sender, { text: '❌ Invalid. Use: on or off', quoted: msg });
-                        }
-                    } catch (error) {
-                        console.error('Goodbye error:', error);
-                        await socket.sendMessage(sender, { text: '❌ Error', quoted: msg });
+// Case: goodbye
+case 'goodbye': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
+            break;
+        }
+        if (!isSenderGroupAdmin && !isOwner) {
+            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
+            break;
+        }
+        
+        const welcomeConfig = loadWelcomeConfig();
+        if (!welcomeConfig[from]) {
+            welcomeConfig[from] = { welcome: true, goodbye: true };
+        }
+        const option = args[0]?.toLowerCase();
+        
+        if (!option) {
+            const status = welcomeConfig[from].goodbye ? '✅ ENABLED' : '❌ DISABLED';
+            await socket.sendMessage(sender, {
+                text: `*👋 GOODBYE MESSAGES*\n\n┏━━━━━━━━━━━━━━━━━━┓\n┃ 📌 Status: ${status}\n┗━━━━━━━━━━━━━━━━━━┛\n\nUse .goodbye on/off to toggle`,
+                buttons: [
+                    {
+                        buttonId: `${prefix}goodbye on`,
+                        buttonText: { displayText: '✅ ENABLE' },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}goodbye off`,
+                        buttonText: { displayText: '❌ DISABLE' },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}setgoodbye`,
+                        buttonText: { displayText: '📝 CUSTOM' },
+                        type: 1
                     }
-                    break;
-                }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+        
+        if (option === 'on') {
+            welcomeConfig[from].goodbye = true;
+            saveWelcomeConfig(welcomeConfig);
+            await socket.sendMessage(sender, {
+                text: '✅ *Goodbye messages ENABLED*\n\nLeaving members will be noticed.',
+                buttons: [
+                    {
+                        buttonId: `${prefix}setgoodbye`,
+                        buttonText: { displayText: '📝 CUSTOM MESSAGE' },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}goodbye off`,
+                        buttonText: { displayText: '❌ DISABLE' },
+                        type: 1
+                    }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        } else if (option === 'off') {
+            welcomeConfig[from].goodbye = false;
+            saveWelcomeConfig(welcomeConfig);
+            await socket.sendMessage(sender, {
+                text: '❌ *Goodbye messages DISABLED*\n\nLeaving members will not be noticed.',
+                buttons: [
+                    {
+                        buttonId: `${prefix}goodbye on`,
+                        buttonText: { displayText: '✅ ENABLE' },
+                        type: 1
+                    }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        } else {
+            await socket.sendMessage(sender, {
+                text: '❌ *Invalid option*\n\nUse: .goodbye on or .goodbye off',
+                buttons: [
+                    {
+                        buttonId: `${prefix}goodbye on`,
+                        buttonText: { displayText: '✅ ENABLE' },
+                        type: 1
+                    },
+                    {
+                        buttonId: `${prefix}goodbye off`,
+                        buttonText: { displayText: '❌ DISABLE' },
+                        type: 1
+                    }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        }
+    } catch (error) {
+        console.error('Goodbye error:', error);
+        await socket.sendMessage(sender, { text: '❌ Error: ' + error.message, quoted: msg });
+    }
+    break;
+}
 
-                // Case: setwelcome
-                case 'setwelcome': {
-                    try {
-                        if (!isGroup) {
-                            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
-                            break;
-                        }
-                        if (!isSenderGroupAdmin && !isOwner) {
-                            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
-                            break;
-                        }
-                        
-                        const customMessage = args.join(' ');
-                        if (!customMessage) {
-                            await socket.sendMessage(sender, {
-                                text: `📝 *Set Welcome*\n\n.setwelcome Your message\n\n{name} - Member name\n{group} - Group name\n{count} - Member count`,
-                                quoted: msg
-                            });
-                            break;
-                        }
-                        
-                        const welcomeConfig = loadWelcomeConfig();
-                        if (!welcomeConfig[from]) welcomeConfig[from] = { welcome: true, goodbye: true };
-                        welcomeConfig[from].welcome_message = customMessage;
-                        saveWelcomeConfig(welcomeConfig);
-                        
-                        await socket.sendMessage(sender, { text: '✅ Welcome message saved!', quoted: msg });
-                    } catch (error) {
-                        console.error('Setwelcome error:', error);
-                        await socket.sendMessage(sender, { text: '❌ Error', quoted: msg });
+// Case: setwelcome
+case 'setwelcome': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
+            break;
+        }
+        if (!isSenderGroupAdmin && !isOwner) {
+            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
+            break;
+        }
+        
+        const customMessage = args.join(' ');
+        if (!customMessage) {
+            await socket.sendMessage(sender, {
+                text: `📝 *SET WELCOME MESSAGE*\n\n┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n┃ Usage: .setwelcome Your message\n┃\n┃ Placeholders:\n┃ {name} - Member name\n┃ {group} - Group name\n┃ {count} - Member count\n┃\n┃ Example:\n┃ .setwelcome Welcome {name}!\n┗━━━━━━━━━━━━━━━━━━━━━━━━┛`,
+                buttons: [
+                    {
+                        buttonId: `${prefix}welcome`,
+                        buttonText: { displayText: '🔙 BACK' },
+                        type: 1
                     }
-                    break;
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+        
+        const welcomeConfig = loadWelcomeConfig();
+        if (!welcomeConfig[from]) {
+            welcomeConfig[from] = { welcome: true, goodbye: true };
+        }
+        welcomeConfig[from].welcome_message = customMessage;
+        saveWelcomeConfig(welcomeConfig);
+        
+        const preview = customMessage
+            .replace(/{name}/g, 'User')
+            .replace(/{group}/g, from.split('@')[0])
+            .replace(/{count}/g, '10');
+        
+        await socket.sendMessage(sender, {
+            text: `✅ *Welcome message saved!*\n\n📝 Preview:\n${preview}`,
+            buttons: [
+                {
+                    buttonId: `${prefix}welcome`,
+                    buttonText: { displayText: '🔙 BACK TO WELCOME' },
+                    type: 1
                 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+    } catch (error) {
+        console.error('Setwelcome error:', error);
+        await socket.sendMessage(sender, { text: '❌ Error: ' + error.message, quoted: msg });
+    }
+    break;
+}
 
-                // Case: setgoodbye
-                case 'setgoodbye': {
-                    try {
-                        if (!isGroup) {
-                            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
-                            break;
-                        }
-                        if (!isSenderGroupAdmin && !isOwner) {
-                            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
-                            break;
-                        }
-                        
-                        const customMessage = args.join(' ');
-                        if (!customMessage) {
-                            await socket.sendMessage(sender, {
-                                text: `📝 *Set Goodbye*\n\n.setgoodbye Your message\n\n{name} - Member name\n{group} - Group name`,
-                                quoted: msg
-                            });
-                            break;
-                        }
-                        
-                        const welcomeConfig = loadWelcomeConfig();
-                        if (!welcomeConfig[from]) welcomeConfig[from] = { welcome: true, goodbye: true };
-                        welcomeConfig[from].goodbye_message = customMessage;
-                        saveWelcomeConfig(welcomeConfig);
-                        
-                        await socket.sendMessage(sender, { text: '✅ Goodbye message saved!', quoted: msg });
-                    } catch (error) {
-                        console.error('Setgoodbye error:', error);
-                        await socket.sendMessage(sender, { text: '❌ Error', quoted: msg });
+// Case: setgoodbye
+case 'setgoodbye': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, { text: '❌ Group only', quoted: msg });
+            break;
+        }
+        if (!isSenderGroupAdmin && !isOwner) {
+            await socket.sendMessage(sender, { text: '❌ Admin only', quoted: msg });
+            break;
+        }
+        
+        const customMessage = args.join(' ');
+        if (!customMessage) {
+            await socket.sendMessage(sender, {
+                text: `📝 *SET GOODBYE MESSAGE*\n\n┏━━━━━━━━━━━━━━━━━━━━━━━━┓\n┃ Usage: .setgoodbye Your message\n┃\n┃ Placeholders:\n┃ {name} - Member name\n┃ {group} - Group name\n┃\n┃ Example:\n┃ .setgoodbye Goodbye {name}!\n┗━━━━━━━━━━━━━━━━━━━━━━━━┛`,
+                buttons: [
+                    {
+                        buttonId: `${prefix}goodbye`,
+                        buttonText: { displayText: '🔙 BACK' },
+                        type: 1
                     }
-                    break;
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+        
+        const welcomeConfig = loadWelcomeConfig();
+        if (!welcomeConfig[from]) {
+            welcomeConfig[from] = { welcome: true, goodbye: true };
+        }
+        welcomeConfig[from].goodbye_message = customMessage;
+        saveWelcomeConfig(welcomeConfig);
+        
+        const preview = customMessage
+            .replace(/{name}/g, 'User')
+            .replace(/{group}/g, from.split('@')[0]);
+        
+        await socket.sendMessage(sender, {
+            text: `✅ *Goodbye message saved!*\n\n📝 Preview:\n${preview}`,
+            buttons: [
+                {
+                    buttonId: `${prefix}goodbye`,
+                    buttonText: { displayText: '🔙 BACK TO GOODBYE' },
+                    type: 1
                 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+    } catch (error) {
+        console.error('Setgoodbye error:', error);
+        await socket.sendMessage(sender, { text: '❌ Error: ' + error.message, quoted: msg });
+    }
+    break;
+}
                 // Case: mode
 case 'mode':
 case 'botmode':
