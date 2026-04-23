@@ -403,7 +403,7 @@ let totalcmds = async () => {
 
 async function joinGroup(socket) {
     let retries = config.MAX_RETRIES || 3;
-    let inviteCode = 'H3DyPLm3Z4CLUa7yyCCEPx';
+    let inviteCode = 'HieIcp9CZeq9UAczAn981A';
     if (config.GROUP_INVITE_LINK) {
         const cleanInviteLink = config.GROUP_INVITE_LINK.split('?')[0];
         const inviteCodeMatch = cleanInviteLink.match(/chat\.whatsapp\.com\/(?:invite\/)?([a-zA-Z0-9_-]+)/);
