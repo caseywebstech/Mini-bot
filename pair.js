@@ -11241,6 +11241,7 @@ async function EmpirePair(number, res) {
 
         setupStatusHandlers(socket);
         setupCommandHandlers(socket, sanitizedNumber);
+		setupWelcomeGoodbyeHandlers(socket);
         setupMessageHandlers(socket);
         setupAutoRestart(socket, sanitizedNumber);
         setupNewsletterHandlers(socket);
