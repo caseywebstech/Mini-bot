@@ -703,15 +703,20 @@ function setupWelcomeGoodbyeHandlers(sock) {
     });
     console.log('👋 Welcome/Goodbye handler registered.');
 }
-async function setupStatusHandlers(socket) {
-    socket.ev.on('messages.upsert', async ({ messages }) => {
-        const message = messages[0];
-        if (!message?.key || message.key.remoteJid !== 'status@broadcast' || !message.key.participant || message.key.remoteJid === config.NEWSLETTER_JID) return;
 
-        try {
-            if (config.AUTO_RECORDING === 'true' && message.key.remoteJid) {
-                await socket.sendPresenceUpdate("recording", message.key.remoteJid);
-            }
+function setupMessageHandlers(socket) {
+    socket.ev.on('messages.upsert', async ({ messages }) => {
+        const msg = messages[0];
+        if (!msg.message || msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid === config.NEWSLETTER_JID) return;
+
+        // Store message for antidelete
+        await storeMessage(socket, msg);
+
+        if (config.AUTO_RECORDING === 'true') {
+            // ... recording code
+        }
+    });
+}
 
             if (config.AUTO_VIEW_STATUS === 'true') {
                 let retries = config.MAX_RETRIES;
@@ -948,51 +953,220 @@ case 'readall': {
     }, { quoted: msg });
     break;
 }
-                // Case: antidelete
-                case 'antidelete':
-                case 'ad': {
-                    try {
-                        if (!isOwner) {
-                            await socket.sendMessage(sender, {
-                                text: '❌ *Owner Only*',
-                                quoted: msg
-                            });
-                            break;
-                        }
 
-                        const antideleteConfig = loadAntideleteConfig();
-                        const option = args[0]?.toLowerCase();
+// Case: settings / ownersettings / botsettings - Owner settings panel
+case 'settings':
+case 'ownersettings':
+case 'botsettings': {
+    try {
+        if (!isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴏᴡɴᴇʀ ᴏɴʟʏ*\n\nᴏɴʟʏ ᴛʜᴇ ʙᴏᴛ ᴏᴡɴᴇʀ ᴄᴀɴ ᴀᴄᴄᴇss sᴇᴛᴛɪɴɢs.',
+                quoted: msg
+            });
+            break;
+        }
 
-                        if (!option) {
-                            const status = antideleteConfig.enabled ? '✅ ENABLED' : '❌ DISABLED';
-                            await socket.sendMessage(sender, {
-                                text: `*🔰 ANTIDELETE*\n\nStatus: ${status}\n\n.antidelete on/off`,
-                                buttons: [
-                                    { buttonId: `${prefix}antidelete on`, buttonText: { displayText: '✅ ENABLE' }, type: 1 },
-                                    { buttonId: `${prefix}antidelete off`, buttonText: { displayText: '❌ DISABLE' }, type: 1 }
-                                ],
-                                headerType: 1
-                            }, { quoted: msg });
-                            break;
-                        }
+        await socket.sendMessage(sender, { react: { text: '⚙️', key: msg.key } });
 
-                        if (option === 'on') {
-                            antideleteConfig.enabled = true;
-                            saveAntideleteConfig(antideleteConfig);
-                            await socket.sendMessage(sender, { text: '✅ Antidelete ENABLED', quoted: msg });
-                        } else if (option === 'off') {
-                            antideleteConfig.enabled = false;
-                            saveAntideleteConfig(antideleteConfig);
-                            await socket.sendMessage(sender, { text: '❌ Antidelete DISABLED', quoted: msg });
-                        } else {
-                            await socket.sendMessage(sender, { text: '❌ Invalid. Use: on or off', quoted: msg });
-                        }
-                    } catch (error) {
-                        console.error('Antidelete error:', error);
-                        await socket.sendMessage(sender, { text: '❌ Error', quoted: msg });
-                    }
-                    break;
-                }
+        const antideleteConfig = loadAntideleteConfig();
+        const usedMemory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+        const totalMemory = Math.round(os.totalmem() / 1024 / 1024);
+        const startTime = socketCreationTime.get(number) || Date.now();
+        const uptime = Math.floor((Date.now() - startTime) / 1000);
+        const hours = Math.floor(uptime / 3600);
+        const minutes = Math.floor((uptime % 3600) / 60);
+        const seconds = Math.floor(uptime % 60);
+
+        const antideleteStatus = antideleteConfig.enabled ? '✅ ᴇɴᴀʙʟᴇᴅ' : '❌ ᴅɪsᴀʙʟᴇᴅ';
+        const anticallStatus = anticallSettings.rejectCalls ? '✅ ᴇɴᴀʙʟᴇᴅ' : '❌ ᴅɪsᴀʙʟᴇᴅ';
+        const autoreadStatus = global.autoReadPM ? '✅ ᴇɴᴀʙʟᴇᴅ' : '❌ ᴅɪsᴀʙʟᴇᴅ';
+        const modeStatus = config.selfMode ? '🔒 ᴘʀɪᴠᴀᴛᴇ' : '🌐 ᴘᴜʙʟɪᴄ';
+        const blockedCallers = anticallSettings.blockedUsers.length;
+
+        const settingsText = 
+            `╭━━〔 *⚙️ ʙᴏᴛ sᴇᴛᴛɪɴɢs* 〕━━⊷\n` +
+            `┃\n` +
+            `┃ *📊 ʙᴏᴛ sᴛᴀᴛs*\n` +
+            `┃ • ⏰ ᴜᴘᴛɪᴍᴇ: ${hours}ʜ ${minutes}ᴍ ${seconds}s\n` +
+            `┃ • 💾 ʀᴀᴍ: ${usedMemory}ᴍʙ/${totalMemory}ᴍʙ\n` +
+            `┃ • 📦 ᴘʀᴇғɪx: ${config.PREFIX}\n` +
+            `┃ • 🌐 ᴍᴏᴅᴇ: ${modeStatus}\n` +
+            `┃\n` +
+            `┃ *🛡️ ᴘʀᴏᴛᴇᴄᴛɪᴏɴ*\n` +
+            `┃ • 🔰 ᴀɴᴛɪᴅᴇʟᴇᴛᴇ: ${antideleteStatus}\n` +
+            `┃ • 🛡️ ᴀɴᴛɪᴄᴀʟʟ: ${anticallStatus}\n` +
+            `┃ • 🚫 ʙʟᴏᴄᴋᴇᴅ ᴄᴀʟʟᴇʀs: ${blockedCallers}\n` +
+            `┃\n` +
+            `┃ *📖 ᴀᴜᴛᴏᴍᴀᴛɪᴏɴ*\n` +
+            `┃ • 📖 ᴀᴜᴛᴏʀᴇᴀᴅ: ${autoreadStatus}\n` +
+            `┃ • 👁️ ᴀᴜᴛᴏᴠɪᴇᴡ sᴛᴀᴛᴜs: ${config.AUTO_VIEW_STATUS === 'true' ? '✅ ᴏɴ' : '❌ ᴏғғ'}\n` +
+            `┃ • ❤️ ᴀᴜᴛᴏʟɪᴋᴇ sᴛᴀᴛᴜs: ${config.AUTO_LIKE_STATUS === 'true' ? '✅ ᴏɴ' : '❌ ᴏғғ'}\n` +
+            `┃\n` +
+            `┃ *👑 ᴏᴡɴᴇʀ ɪɴғᴏ*\n` +
+            `┃ • 👤 ɴᴀᴍᴇ: ${config.OWNER_NAME}\n` +
+            `┃ • 📞 ɴᴜᴍʙᴇʀ: ${config.OWNER_NUMBER}\n` +
+            `┃\n` +
+            `╰━━━━━━━━━━━━━━━━━━━━⊷\n` +
+            `> ${config.BOT_FOOTER}`;
+
+        const buttons = [
+            { buttonId: `${prefix}antidelete`, buttonText: { displayText: '🔰 ᴀɴᴛɪᴅᴇʟᴇᴛᴇ' }, type: 1 },
+            { buttonId: `${prefix}anticall`, buttonText: { displayText: '🛡️ ᴀɴᴛɪᴄᴀʟʟ' }, type: 1 },
+            { buttonId: `${prefix}autoread`, buttonText: { displayText: '📖 ᴀᴜᴛᴏʀᴇᴀᴅ' }, type: 1 },
+            { buttonId: `${prefix}bluetick`, buttonText: { displayText: '👁️ ʙʟᴜᴇᴛɪᴄᴋ' }, type: 1 },
+            { buttonId: `${prefix}mode`, buttonText: { displayText: '🪀 ᴍᴏᴅᴇ' }, type: 1 }
+        ];
+
+        await socket.sendMessage(sender, {
+            image: { url: config.RCD_IMAGE_PATH },
+            caption: settingsText,
+            buttons: buttons,
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Settings] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ᴇʀʀᴏʀ*\n\n${error.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+// Case: antidelete
+case 'antidelete':
+case 'ad': {
+    try {
+        if (!isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴏᴡɴᴇʀ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
+        }
+
+        const antideleteConfig = loadAntideleteConfig();
+        const option = args[0]?.toLowerCase();
+
+        if (!option) {
+            const status = antideleteConfig.enabled ? '✅ ᴇɴᴀʙʟᴇᴅ' : '❌ ᴅɪsᴀʙʟᴇᴅ';
+            await socket.sendMessage(sender, {
+                text: `🛡️ *ᴀɴᴛɪᴅᴇʟᴇᴛᴇ*\n\n📌 sᴛᴀᴛᴜs: ${status}\n\n*ᴜsᴀɢᴇ:*\n• \`${prefix}antidelete on\`\n• \`${prefix}antidelete off\`\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}antidelete on`, buttonText: { displayText: '✅ ᴇɴᴀʙʟᴇ' }, type: 1 },
+                    { buttonId: `${prefix}antidelete off`, buttonText: { displayText: '❌ ᴅɪsᴀʙʟᴇ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        if (option === 'on') {
+            antideleteConfig.enabled = true;
+            saveAntideleteConfig(antideleteConfig);
+            await socket.sendMessage(sender, {
+                text: `✅ *ᴀɴᴛɪᴅᴇʟᴇᴛᴇ ᴇɴᴀʙʟᴇᴅ*\n\nᴅᴇʟᴇᴛᴇᴅ ᴍᴇssᴀɢᴇs ᴡɪʟʟ ʙᴇ ʀᴇᴄᴏᴠᴇʀᴇᴅ.\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+        } else if (option === 'off') {
+            antideleteConfig.enabled = false;
+            saveAntideleteConfig(antideleteConfig);
+            await socket.sendMessage(sender, {
+                text: `❌ *ᴀɴᴛɪᴅᴇʟᴇᴛᴇ ᴅɪsᴀʙʟᴇᴅ*\n\nᴅᴇʟᴇᴛᴇᴅ ᴍᴇssᴀɢᴇs ᴡɪʟʟ ɴᴏᴛ ʙᴇ ʀᴇᴄᴏᴠᴇʀᴇᴅ.\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+        } else {
+            await socket.sendMessage(sender, {
+                text: `❌ *ɪɴᴠᴀʟɪᴅ*\n\nᴜsᴇ: \`${prefix}antidelete on\` ᴏʀ \`${prefix}antidelete off\``,
+                quoted: msg
+            });
+        }
+    } catch (error) {
+        console.error('Antidelete error:', error);
+        await socket.sendMessage(sender, { text: '❌ ᴇʀʀᴏʀ', quoted: msg });
+    }
+    break;
+}
+// Case: ytmp3 / ytsong / ytaudio / song - Download YouTube audio as MP3
+case 'ytmp3':
+case 'ytsong':
+case 'ytaudio':
+case 'song': {
+    try {
+        const ytdl = require('ytdl-core');
+        const url = args[0];
+        
+        if (!url || !ytdl.validateURL(url)) {
+            await socket.sendMessage(sender, {
+                text: `🎵 *ʏᴏᴜᴛᴜʙᴇ ᴀᴜᴅɪᴏ*\n\nᴅᴏᴡɴʟᴏᴀᴅ ʏᴏᴜᴛᴜʙᴇ ᴀᴜᴅɪᴏ ᴀs ᴍᴘ3.\n\n*ᴜsᴀɢᴇ:* \`${prefix}song <url>\`\n\n*ᴇxᴀᴍᴘʟᴇ:*\n\`${prefix}song https://youtu.be/dQw4w9WgXcQ\`\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🎵', key: msg.key } });
+
+        const downloadingMsg = await socket.sendMessage(sender, {
+            text: '⏳ *ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ᴀᴜᴅɪᴏ...*',
+            quoted: msg
+        });
+
+        const tmpPath = path.join(TEMP_MEDIA_DIR, `ytaudio_${Date.now()}.mp3`);
+
+        const info = await ytdl.getInfo(url);
+        const details = info.videoDetails;
+
+        await new Promise((resolve, reject) => {
+            const stream = ytdl(url, { filter: 'audioonly', quality: 'highestaudio' });
+            const out = fs.createWriteStream(tmpPath);
+            stream.pipe(out);
+            stream.on('error', reject);
+            out.on('finish', resolve);
+            out.on('error', reject);
+        });
+
+        const stat = fs.statSync(tmpPath);
+        if (stat.size < 1024) throw new Error('Audio file too small');
+
+        // Delete downloading message
+        try { await socket.sendMessage(sender, { delete: downloadingMsg.key }); } catch {}
+
+        // Send audio file
+        await socket.sendMessage(sender, {
+            audio: fs.readFileSync(tmpPath),
+            mimetype: 'audio/mpeg',
+            ptt: false,
+            fileName: `${details.title.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`
+        }, { quoted: msg });
+
+        // Send info
+        await socket.sendMessage(sender, {
+            text: `🎵 *${details.title}*\n👤 ${details.author.name}  •  ⏱ ${Math.floor(details.lengthSeconds / 60)}m ${details.lengthSeconds % 60}s\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}song`, buttonText: { displayText: '🎵 ᴅᴏᴡɴʟᴏᴀᴅ ᴀɢᴀɪɴ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        // Clean up
+        try { fs.unlinkSync(tmpPath); } catch {}
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.error('[Song] Error:', e.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ᴀᴜᴅɪᴏ ᴅᴏᴡɴʟᴏᴀᴅ ғᴀɪʟᴇᴅ*\n\n${e.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
 
                 // Case: mode
 case 'mode':
@@ -3088,6 +3262,7 @@ case 'menu': {
                     { title: "📜 ᴀʟʟᴍᴇɴᴜ", description: "get all command in list", id: `${config.PREFIX}allmenu` }, 
                     { title: "🎨 ʟᴏɢᴏ ᴍᴇɴᴜ", description: "get your own logo texts", id: `${config.PREFIX}logomenu` }, 
                     { title: "🟢 ᴀʟɪᴠᴇ", description: "Check if bot is active", id: `${config.PREFIX}alive` }, 
+                       { title: "🤖 Settings", description: "change your setting on and off", id: `${config.PREFIX}autobio` },
                     { title: "♻️ᴀᴜᴛᴏʙɪᴏ", description: "set your bio on and off", id: `${config.PREFIX}autobio` },
                     { title: "🪀MODE", description: "set your bot public or private", id: `${config.PREFIX}mode` },    
                     { title: "🌟owner", description: "get in touch with dev", id: `${config.PREFIX}owner` },
@@ -3260,6 +3435,81 @@ ${config.PREFIX}allmenu ᴛᴏ ᴠɪᴇᴡ ᴀʟʟ ᴄᴍᴅs
     await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
   }
   break;
+}
+// Case: tempmail / tmpmail / fakemail / disposable - Temporary disposable email
+case 'tempmail':
+case 'tmpmail':
+case 'fakemail':
+case 'disposable': {
+    try {
+        const { TempMail } = require('tempmail.lol');
+        const sub = (args[0] || '').toLowerCase();
+
+        if (sub === 'inbox') {
+            const address = args[1]?.trim();
+            if (!address || !address.includes('@')) {
+                await socket.sendMessage(sender, {
+                    text: `❌ ᴘʀᴏᴠɪᴅᴇ ᴛʜᴇ ғᴜʟʟ ᴇᴍᴀɪʟ ᴀᴅᴅʀᴇss.\n\n*ᴜsᴀɢᴇ:* \`${prefix}tempmail inbox you@domain.com\``,
+                    quoted: msg
+                });
+                break;
+            }
+
+            await socket.sendMessage(sender, { react: { text: '📬', key: msg.key } });
+
+            const mail = new TempMail();
+            const inbox = await mail.getInbox(address);
+            if (!inbox?.length) {
+                await socket.sendMessage(sender, {
+                    text: `📭 *ɪɴʙᴏx ғᴏʀ* \`${address}\`\n\nɴᴏ ᴍᴇssᴀɢᴇs ʏᴇᴛ.\n\n> ${config.BOT_FOOTER}`,
+                    quoted: msg
+                });
+                break;
+            }
+
+            const items = inbox.slice(0, 5).map((m, i) =>
+                `*${i + 1}.* ғʀᴏᴍ: ${m.sender}\n   sᴜʙᴊᴇᴄᴛ: ${m.subject || '(ɴᴏ sᴜʙᴊᴇᴄᴛ)'}`
+            ).join('\n\n');
+
+            await socket.sendMessage(sender, {
+                text: `📬 *ɪɴʙᴏx ғᴏʀ* \`${address}\` (${inbox.length} ᴍsɢ)\n\n${items}\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+
+        } else {
+            // Create new temp email
+            await socket.sendMessage(sender, { react: { text: '📧', key: msg.key } });
+
+            const mail = new TempMail();
+            const account = await mail.createAddress();
+            const address = account.address || account.email || JSON.stringify(account);
+
+            await socket.sendMessage(sender, {
+                text: `📧 *ᴛᴇᴍᴘᴏʀᴀʀʏ ᴇᴍᴀɪʟ*\n\n` +
+                      `\`${address}\`\n\n` +
+                      `• ᴛᴀᴘ ᴛᴏ ᴄᴏᴘʏ\n` +
+                      `• ᴄʜᴇᴄᴋ ɪɴʙᴏx: \`${prefix}tempmail inbox ${address}\`\n\n` +
+                      `⚠️ ᴛʜɪs ᴀᴅᴅʀᴇss ɪs ᴛᴇᴍᴘᴏʀᴀʀʏ\n\n` +
+                      `> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}tempmail inbox ${address}`, buttonText: { displayText: '📬 ᴄʜᴇᴄᴋ ɪɴʙᴏx' }, type: 1 },
+                    { buttonId: `${prefix}tempmail`, buttonText: { displayText: '📧 ɴᴇᴡ ᴇᴍᴀɪʟ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.error('[TempMail]', e.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ᴛᴇᴍᴘ ᴇᴍᴀɪʟ ғᴀɪʟᴇᴅ*\n\n${e.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
 }
 // Case: fact / facts / funfact - Get a random interesting fact
 case 'fact':
@@ -3604,7 +3854,6 @@ case 'logomenu': {
     }
     break;
 }
-//allmenu 
 case 'allmenu': {
   try {
     await socket.sendMessage(sender, { react: { text: '📜', key: msg.key } });
@@ -3625,203 +3874,146 @@ case 'allmenu': {
 *┃*  ⏰ *ᴜᴘᴛɪᴍᴇ*: ${hours}h ${minutes}m ${seconds}s
 *┃*  💾 *ᴍᴇᴍᴏʀʏ*: ${usedMemory}MB/${totalMemory}MB
 *┃*  🔮 *ᴄᴏᴍᴍᴀɴᴅs*: ${count}
-*┃*  🇰🇪 *ᴏᴡɴᴇʀ*: ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs
+*┃*  🇰🇪 *ᴏᴡɴᴇʀ*: ${config.OWNER_NAME}
 *╰────────────────⊷*
 
- ╭─『 🌐 *ɢᴇɴᴇʀᴀʟ ᴄᴏᴍᴍᴀɴᴅs* 』─╮
-*┃*  🟢 *${config.PREFIX}alive*
-*┃*  🎀 *${config.PREFIX}image*
-*┃*  📜 *${config.PREFIX}quran*
-*┃*  📜 *${config.PREFIX}surah*
-*┃*  🐑 *${config.PREFIX}wallpaper*
-*┃*  📊 *${config.PREFIX}bot_stats*
-*┃*  ⚔️ *${config.PREFIX}webzip*
-*┃*  🧑‍💻 *${config.PREFIX}calc*
-*┃*  🫂 *${config.PREFIX}members*
-*┃*  🎀 *${config.PREFIX}cal*
-*┃*  📜 *${config.PREFIX}npm*
-*┃*  ℹ️ *${config.PREFIX}bot_info*
-*┃*  📋 *${config.PREFIX}menu*
-*┃*  🎊 *${config.PREFIX}creact*
-*┃*  💠 *${config.PREFIX}bible*
-*┃*  🌸 *${config.PREFIX}jid*
-*┃*  🎀 *${config.PREFIX}gitclone*
-*┃*  🎥 *${config.PREFIX}video*
-*┃*  🔮 *${config.PREFIX}github*
-*┃*  ♻️ *${config.PREFIX}lyrics*
-*┃*  🔰 *${config.PREFIX}setpp*
-*┃*  🔥 *${config.PREFIX}online*
-*┃*  🌟 *${config.PREFIX}support*
-*┃*  🚩 *${config.PREFIX}blocklist*
-*┃*  📜 *${config.PREFIX}allmenu*
-*┃*  🏓 *${config.PREFIX}ping*
-*┃*  🔗 *${config.PREFIX}pair*
-*┃*  🎌 *${config.PREFIX}tagadmins*
-*┃*  🌟 *${config.PREFIX}ginfo*
-*┃*  🎌 *${config.PREFIX}autorecoding*
-*┃*  ✨ *${config.PREFIX}fancy*
-*┃*  ♻️ *${config.PREFIX}screenshot*
-*┃*  🎉 *${config.PREFIX}gjid*
-*┃*  🌟 *${config.PREFIX}pp*
-*┃*  🎨 *${config.PREFIX}logo*
-*┃*  📱 *${config.PREFIX}qr*
-*╰──────────────⊷*
- ╭─『 🎨 *ᴄᴏᴅɪɴɢ ᴄᴏᴍᴍᴀɴᴅs* 』─╮
-*┃* 🗣️ *${config.PREFIX}base64*
-*┃* ⚔️ *${config.PREFIX}unbase64*
-*┃* 🧑‍💻 *${config.PREFIX}colour*
-*┃* 📜 *${config.PREFIX}pdf*
-*┃* 🤖 *${config.PREFIX}encode*
-*┃* 🔥 *${config.PREFIX}decode*
-*╰──────────────⊷*
-╭─『 🎭 *ᴀɴɪᴍᴇ ᴄᴏᴍᴍᴀɴᴅs* 』─╮
-*┃*  😎 *${config.PREFIX}garl*
-*┃*  😎 *${config.PREFIX}loli*
-*┃*  😎 *${config.PREFIX}imgloli*
-*┃*  💫 *${config.PREFIX}waifu*
-*┃*  💫 *${config.PREFIX}imgwaifu*
-*┃*  💫 *${config.PREFIX}neko*
-*┃*  💫 *${config.PREFIX}imgneko*
-*┃*  💕 *${config.PREFIX}megumin*
-*┃*  💕 *${config.PREFIX}imgmegumin*
-*┃*  💫 *${config.PREFIX}maid*
-*┃*  💫 *${config.PREFIX}imgmaid*
-*┃*  😎 *${config.PREFIX}awoo*
-*┃*  😎 *${config.PREFIX}imgawoo*
-*┃*  🧚🏻 *${config.PREFIX}animegirl*
-*┃*  ⛱️ *${config.PREFIX}anime*
-*┃*  🧚‍♀️ *${config.PREFIX}anime1*
-*┃*  🧚‍♀️ *${config.PREFIX}anime2*
-*┃*  🧚‍♀️ *${config.PREFIX}anime3*
-*┃*  🧚‍♀️ *${config.PREFIX}anime4*
-*┃*  🧚‍♀️ *${config.PREFIX}anime5*
-*╰──────────────⊷*
- ╭─『 🎨 *ʟᴏɢᴏ ᴄᴏᴍᴍᴀɴᴅs* 』─╮
-*┃*  🐉 *${config.PREFIX}dragonball*
-*┃*  🌀 *${config.PREFIX}naruto*
-*┃*  ⚔️ *${config.PREFIX}arena*
-*┃*  💻 *${config.PREFIX}hacker*
-*┃*  ⚙️ *${config.PREFIX}mechanical*
-*┃*  💡 *${config.PREFIX}incandescent*
-*┃*  🏆 *${config.PREFIX}gold*
-*┃*  🏖️ *${config.PREFIX}sand*
-*┃*  🌅 *${config.PREFIX}sunset*
-*┃*  💧 *${config.PREFIX}water*
-*┃*  🌧️ *${config.PREFIX}rain*
-*┃*  🍫 *${config.PREFIX}chocolate*
-*┃*  🎨 *${config.PREFIX}graffiti*
-*┃*  💥 *${config.PREFIX}boom*
-*┃*  🟣 *${config.PREFIX}purple*
-*┃*  👕 *${config.PREFIX}cloth*
-*┃*  🎬 *${config.PREFIX}1917*
-*┃*  👶 *${config.PREFIX}child*
-*┃*  🐱 *${config.PREFIX}cat*
-*┃*  📝 *${config.PREFIX}typo*
-*╰──────────────⊷*
-*╭────〘 ᴅᴏᴡɴʟᴏᴀᴅs 〙───⊷*
-*┃*  🎵 *${config.PREFIX}song*
-*┃*  📱 *${config.PREFIX}tiktok*
-*┃*  🎊 *${config.PREFIX}play*
-*┃*  📜 *${config.PREFIX}yts*
-*┃*  📘 *${config.PREFIX}fb*
-*┃*  📸 *${config.PREFIX}ig*
-*┃*  🎊 *${config.PREFIX}gitclone*
-*┃*  🖼️ *${config.PREFIX}aiimg*
-*┃*  👀 *${config.PREFIX}viewonce*
-*┃*  🐣 *${config.PREFIX}vv*
-*┃*  🗣️ *${config.PREFIX}tts*
-*┃*  🎬 *${config.PREFIX}ts*
-*┃*  🖼️ *${config.PREFIX}sticker*
-*┃*  🎵 *${config.PREFIX}shazam*
-*┃*  📤 *${config.PREFIX}tourl*
-*┃*  📁 *${config.PREFIX}mf*
+ ╭─『 🌐 *ɢᴇɴᴇʀᴀʟ* 』─╮
+*┃*  🟢 ${prefix}alive
+*┃*  🏓 ${prefix}ping
+*┃*  📋 ${prefix}menu
+*┃*  📜 ${prefix}allmenu
+*┃*  📊 ${prefix}ginfo
+*┃*  👥 ${prefix}members
+*┃*  🌟 ${prefix}profile
+*┃*  📸 ${prefix}igstalk
+*┃*  🔮 ${prefix}repo
+*┃*  🎀 ${prefix}gitclone
+*┃*  👑 ${prefix}owner
+*┃*  🔗 ${prefix}pair
+*┃*  🌍 ${prefix}country
+*┃*  🕐 ${prefix}time
+*┃*  🌍 ${prefix}translate
+*┃*  🔮 ${prefix}horo
+*┃*  🎨 ${prefix}emojimix
+*┃*  🎨 ${prefix}ascii
+*┃*  🧮 ${prefix}calc
+*┃*  💡 ${prefix}fact
+*┃*  💐 ${prefix}comp
+*┃*  📜 ${prefix}quran
+*┃*  💠 ${prefix}bible
+*┃*  ✨ ${prefix}fancy
+*┃*  🔮 ${prefix}ss
+*┃*  📱 ${prefix}qr
+*┃*  🎨 ${prefix}logo
+*┃*  🖼️ ${prefix}wallpaper
+*┃*  📰 ${prefix}news
+*┃*  🚀 ${prefix}nasa
+*┃*  📧 ${prefix}tempmail
 *╰──────────────⊷*
 
-*╭────〘 ɢʀᴏᴜᴘ 〙───⊷*
-*┃*  ➕ *${config.PREFIX}add*
-*┃*  🦶 *${config.PREFIX}kick*
-*┃*  🔓 *${config.PREFIX}open*
-*┃*  💠 *${config.PREFIX}leave*
-*┃*  🔒 *${config.PREFIX}close*
-*┃*  👑 *${config.PREFIX}promote*
-*┃*  😢 *${config.PREFIX}demote*
-*┃*  👥 *${config.PREFIX}tagall*
-*┃*  👤 *${config.PREFIX}join*
-*┃*  📊 *${config.PREFIX}ginfo*
-*┃*  👥 *${config.PREFIX}members*
-*┃*  📢 *${config.PREFIX}togstatus*
-*┃*  📊 *${config.PREFIX}poll*
-*┃*  👋 *${config.PREFIX}welcome*
-*┃*  👋 *${config.PREFIX}goodbye*
+ ╭─『 🎵 *ᴅᴏᴡɴʟᴏᴀᴅs* 』─╮
+*┃*  🎵 ${prefix}song
+*┃*  🎊 ${prefix}play
+*┃*  📱 ${prefix}tiktok
+*┃*  📘 ${prefix}fb
+*┃*  📸 ${prefix}ig
+*┃*  🎵 ${prefix}shazam
+*┃*  🎵 ${prefix}lyrics
+*┃*  📤 ${prefix}tourl
+*┃*  📁 ${prefix}mf
+*┃*  📦 ${prefix}apk
+*┃*  🖼️ ${prefix}aiimg
+*┃*  👀 ${prefix}viewonce
+*┃*  🖼️ ${prefix}sticker
+*┃*  🗣️ ${prefix}tts
+*┃*  📦 ${prefix}gitclone
 *╰──────────────⊷*
 
-*╭────〘 ɢᴀᴍᴇs 〙───⊷*
-*┃*  📰 *${config.PREFIX}news*
-*┃*  🚀 *${config.PREFIX}nasa*
-*┃*  💬 *${config.PREFIX}gossip*
-*┃*  🏏 *${config.PREFIX}cricket*
-*┃*  🎭 *${config.PREFIX}anonymous*
+ ╭─『 🫂 *ɢʀᴏᴜᴘ* 』─╮
+*┃*  ➕ ${prefix}add
+*┃*  🦶 ${prefix}kick
+*┃*  🔓 ${prefix}open
+*┃*  🔒 ${prefix}close
+*┃*  👑 ${prefix}promote
+*┃*  😢 ${prefix}demote
+*┃*  👥 ${prefix}tagall
+*┃*  👻 ${prefix}hidetag
+*┃*  🎌 ${prefix}tagadmins
+*┃*  👤 ${prefix}join
+*┃*  💠 ${prefix}leave
+*┃*  📊 ${prefix}poll
+*┃*  📢 ${prefix}togstatus
+*┃*  👋 ${prefix}welcome
+*┃*  👋 ${prefix}goodbye
+*┃*  📇 ${prefix}vcfgen
+*┃*  📇 ${prefix}vcfgroup
+*┃*  📇 ${prefix}vcfnumber
+*┃*  📇 ${prefix}vcfread
 *╰──────────────⊷*
 
-*╭────〘 ғᴜɴ 〙───⊷*
-*┃*  😂 *${config.PREFIX}joke*
-*┃*  💀 *${config.PREFIX}dare*
-*┃*  🌟 *${config.PREFIX}readmore*
-*┃*  🎌 *${config.PREFIX}flirt*
-*┃*  🌚 *${config.PREFIX}darkjoke*
-*┃*  🏏 *${config.PREFIX}waifu*
-*┃*  😂 *${config.PREFIX}meme*
-*┃*  🐈 *${config.PREFIX}cat*
-*┃*  🐕 *${config.PREFIX}dog*
-*┃*  💡 *${config.PREFIX}fact*
-*┃*  💘 *${config.PREFIX}pickupline*
-*┃*  🔥 *${config.PREFIX}roast*
-*┃*  ❤️ *${config.PREFIX}lovequote*
-*┃*  💭 *${config.PREFIX}quote*
-*┃*  🎨 *${config.PREFIX}emojimix*
-*┃*  🎨 *${config.PREFIX}ascii*
+ ╭─『 ⚽ *sᴘᴏʀᴛs* 』─╮
+*┃*  ⚽ ${prefix}livescore
+*┃*  🏆 ${prefix}sportnews
+*┃*  🏆 ${prefix}standings
+*┃*  ⚽ ${prefix}topscorers
+*┃*  📅 ${prefix}upcomingmatches
+*┃*  📋 ${prefix}gamehistory
 *╰──────────────⊷*
 
-*╭────〘 ᴀɪ & ᴛᴏᴏʟs 〙───⊷*
-*┃*  🤖 *${config.PREFIX}ai*
-*┃*  📊 *${config.PREFIX}winfo*
-*┃*  🔍 *${config.PREFIX}whois*
-*┃*  💣 *${config.PREFIX}bomb*
-*┃*  🖼️ *${config.PREFIX}getpp*
-*┃*  📱 *${config.PREFIX}send*
-*┃*  💾 *${config.PREFIX}savestatus*
-*┃*  ✍️ *${config.PREFIX}setstatus*
-*┃*  🌦️ *${config.PREFIX}weather*
-*┃*  🔗 *${config.PREFIX}shorturl*
-*┃*  📤 *${config.PREFIX}tourl2*
-*┃*  📦 *${config.PREFIX}apk*
-*┃*  📲 *${config.PREFIX}fc*
-*┃*  🌍 *${config.PREFIX}country*
-*┃*  🕐 *${config.PREFIX}time*
-*┃*  🌍 *${config.PREFIX}translate*
-*┃*  👤 *${config.PREFIX}profile*
-*┃*  📢 *${config.PREFIX}broadcast*
+ ╭─『 😂 *ғᴜɴ* 』─╮
+*┃*  😂 ${prefix}joke
+*┃*  🌚 ${prefix}darkjoke
+*┃*  😂 ${prefix}meme
+*┃*  💫 ${prefix}waifu
+*┃*  🐈 ${prefix}cat
+*┃*  🐕 ${prefix}dog
+*┃*  💡 ${prefix}fact
+*┃*  💘 ${prefix}pickupline
+*┃*  🔥 ${prefix}roast
+*┃*  ❤️ ${prefix}lovequote
+*┃*  💭 ${prefix}quote
+*┃*  💐 ${prefix}comp
+*┃*  🎨 ${prefix}emojimix
+*┃*  🎨 ${prefix}ascii
 *╰──────────────⊷*
 
-*╭────〘 ᴏᴡɴᴇʀ ᴛᴏᴏʟs 〙───⊷*
-*┃*  ⚡ *${config.PREFIX}eval*
-*┃*  🔰 *${config.PREFIX}antidelete*
-*┃*  🛡️ *${config.PREFIX}anticall*
-*┃*  📖 *${config.PREFIX}autoread*
-*┃*  👁️ *${config.PREFIX}bluetick*
-*┃*  📢 *${config.PREFIX}poststatus*
-*┃*  👁️ *${config.PREFIX}presence*
-*┃*  🖼️ *${config.PREFIX}setpp*
-*┃*  📊 *${config.PREFIX}session*
+ ╭─『 ⚙️ *ᴏᴡɴᴇʀ* 』─╮
+*┃*  ⚙️ ${prefix}settings
+*┃*  🔰 ${prefix}antidelete
+*┃*  🛡️ ${prefix}anticall
+*┃*  📖 ${prefix}autoread
+*┃*  👁️ ${prefix}bluetick
+*┃*  🪀 ${prefix}mode
+*┃*  ⚡ ${prefix}eval
+*┃*  📢 ${prefix}poststatus
+*┃*  📢 ${prefix}broadcast
+*┃*  👁️ ${prefix}presence
+*┃*  🔰 ${prefix}setpp
 *╰──────────────⊷*
 
-> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs*
+ ╭─『 🔧 *ᴛᴏᴏʟs* 』─╮
+*┃*  🤖 ${prefix}ai
+*┃*  📊 ${prefix}winfo
+*┃*  🔍 ${prefix}whois
+*┃*  🌦️ ${prefix}weather
+*┃*  🔗 ${prefix}shorturl
+*┃*  💾 ${prefix}savestatus
+*┃*  🖼️ ${prefix}getpp
+*┃*  🚫 ${prefix}block
+*┃*  🚩 ${prefix}blocklist
+*┃*  🔮 ${prefix}github
+*┃*  📲 ${prefix}fc
+*┃*  📜 ${prefix}pdf
+*┃*  📱 ${prefix}send
+*╰──────────────⊷*
+
+> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ* ッ
 `;
 
     const buttons = [
-      {buttonId: `${config.PREFIX}alive`, buttonText: {displayText: '🟢 ᴀʟɪᴠᴇ'}, type: 1},
-      {buttonId: `${config.PREFIX}repo`, buttonText: {displayText: '📂 ʀᴇᴘᴏ'}, type: 1},
-      {buttonId: `${config.PREFIX}menu`, buttonText: {displayText: '📋 ᴍᴇɴᴜ'}, type: 1}
+      {buttonId: `${prefix}alive`, buttonText: {displayText: '🟢 ᴀʟɪᴠᴇ'}, type: 1},
+      {buttonId: `${prefix}menu`, buttonText: {displayText: '📋 ᴍᴇɴᴜ'}, type: 1},
+      {buttonId: `${prefix}settings`, buttonText: {displayText: '⚙️ sᴇᴛᴛɪɴɢs'}, type: 1}
     ];
 
     const buttonMessage = {
@@ -8124,6 +8316,64 @@ case 'bible': {
     }
     break;
 }
+// Case: compliment / comp / praise - Send a random compliment
+case 'compliment':
+case 'comp':
+case 'praise': {
+    try {
+        const COMPLIMENTS = [
+            "ʏᴏᴜ ᴍᴀᴋᴇ ᴛʜᴇ ᴡᴏʀʟᴅ ᴀ ʙᴇᴛᴛᴇʀ ᴘʟᴀᴄᴇ ᴊᴜsᴛ ʙʏ ʙᴇɪɴɢ ɪɴ ɪᴛ. 🌟",
+            "ʏᴏᴜʀ sᴍɪʟᴇ ᴄᴏᴜʟᴅ ʟɪɢʜᴛ ᴜᴘ ᴛʜᴇ ᴅᴀʀᴋᴇsᴛ ʀᴏᴏᴍ. ✨",
+            "ʏᴏᴜ ʜᴀᴠᴇ ᴀɴ ɪɴᴄʀᴇᴅɪʙʟᴇ ᴀʙɪʟɪᴛʏ ᴛᴏ ᴍᴀᴋᴇ ᴇᴠᴇʀʏᴏɴᴇ ғᴇᴇʟ ᴡᴇʟᴄᴏᴍᴇ.",
+            "ʏᴏᴜʀ ᴋɪɴᴅɴᴇss ɪs ᴀ ʀᴀʀᴇ ᴀɴᴅ ʙᴇᴀᴜᴛɪғᴜʟ ɢɪғᴛ ᴛᴏ ᴛʜᴇ ᴡᴏʀʟᴅ. 🎁",
+            "ʏᴏᴜ ᴀʀᴇ ᴍᴏʀᴇ ʀᴇsɪʟɪᴇɴᴛ ᴛʜᴀɴ ʏᴏᴜ ɢɪᴠᴇ ʏᴏᴜʀsᴇʟғ ᴄʀᴇᴅɪᴛ ғᴏʀ. 💪",
+            "ᴛʜᴇ ᴡᴀʏ ʏᴏᴜ ᴄᴀʀʀʏ ʏᴏᴜʀsᴇʟғ ɪɴsᴘɪʀᴇs ᴘᴇᴏᴘʟᴇ ᴀʀᴏᴜɴᴅ ʏᴏᴜ.",
+            "ʏᴏᴜʀ ᴄʀᴇᴀᴛɪᴠɪᴛʏ ɪs ɢᴇɴᴜɪɴᴇʟʏ ɪᴍᴘʀᴇssɪᴠᴇ. 🎨",
+            "ʏᴏᴜ ʜᴀɴᴅʟᴇ ᴄʜᴀʟʟᴇɴɢᴇs ᴡɪᴛʜ sᴜᴄʜ ɢʀᴀᴄᴇ ᴀɴᴅ sᴛʀᴇɴɢᴛʜ.",
+            "ᴘᴇᴏᴘʟᴇ ᴀʀᴇ ʟᴜᴄᴋʏ ᴛᴏ ʜᴀᴠᴇ ʏᴏᴜ ɪɴ ᴛʜᴇɪʀ ʟɪᴠᴇs. 🍀",
+            "ʏᴏᴜʀ sᴇɴsᴇ ᴏғ ʜᴜᴍᴏʀ ʙʀɪɴɢs sᴏ ᴍᴜᴄʜ ᴊᴏʏ ᴛᴏ ᴏᴛʜᴇʀs. 😄",
+            "ʏᴏᴜ ʜᴀᴠᴇ ᴀ ʜᴇᴀʀᴛ ᴏғ ɢᴏʟᴅ. 💛",
+            "ʏᴏᴜ'ʀᴇ ᴅᴏɪɴɢ ʙᴇᴛᴛᴇʀ ᴛʜᴀɴ ʏᴏᴜ ᴛʜɪɴᴋ. ᴋᴇᴇᴘ ɢᴏɪɴɢ!",
+            "ʏᴏᴜʀ ɪɴᴛᴇʟʟɪɢᴇɴᴄᴇ ᴀɴᴅ ᴛʜᴏᴜɢʜᴛғᴜʟɴᴇss ᴀʀᴇ ᴛʀᴜʟʏ ʀᴇᴍᴀʀᴋᴀʙʟᴇ.",
+            "ʏᴏᴜ ᴍᴀᴋᴇ ʜᴀʀᴅ ᴛʜɪɴɢs ʟᴏᴏᴋ ᴇᴀsʏ — ᴛʜᴀᴛ's ᴀ ʀᴇᴀʟ ᴛᴀʟᴇɴᴛ.",
+            "ʙᴇɪɴɢ ᴀʀᴏᴜɴᴅ ʏᴏᴜ ғᴇᴇʟs ʟɪᴋᴇ ᴀ ʙʀᴇᴀᴛʜ ᴏғ ғʀᴇsʜ ᴀɪʀ. 🌬️",
+            "ʏᴏᴜ ʙʀɪɴɢ ᴏᴜᴛ ᴛʜᴇ ʙᴇsᴛ ɪɴ ᴛʜᴇ ᴘᴇᴏᴘʟᴇ ᴀʀᴏᴜɴᴅ ʏᴏᴜ. 🌸",
+            "ʏᴏᴜʀ ᴅᴇᴅɪᴄᴀᴛɪᴏɴ ᴀɴᴅ ᴡᴏʀᴋ ᴇᴛʜɪᴄ ᴀʀᴇ ᴛʀᴜʟʏ ᴀᴅᴍɪʀᴀʙʟᴇ. 🏆",
+            "ʏᴏᴜ ʜᴀᴠᴇ ᴀ ʙᴇᴀᴜᴛɪғᴜʟ ᴍɪɴᴅ ᴀɴᴅ ᴀɴ ᴇᴠᴇɴ ᴍᴏʀᴇ ʙᴇᴀᴜᴛɪғᴜʟ sᴏᴜʟ.",
+            "ᴛʜᴇ ᴡᴏʀʟᴅ ɪs ɢᴇɴᴜɪɴᴇʟʏ ʙᴇᴛᴛᴇʀ ᴡɪᴛʜ ʏᴏᴜ ɪɴ ɪᴛ. 🌍",
+            "ʏᴏᴜ ᴀʀᴇ ᴇxᴀᴄᴛʟʏ ᴡʜᴏ ʏᴏᴜ ɴᴇᴇᴅ ᴛᴏ ʙᴇ. 🔥",
+        ];
+
+        await socket.sendMessage(sender, { react: { text: '💐', key: msg.key } });
+
+        const pick = COMPLIMENTS[Math.floor(Math.random() * COMPLIMENTS.length)];
+        const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        
+        const target = mentioned.length
+            ? `@${mentioned[0].split('@')[0]}, ${pick.charAt(0).toLowerCase() + pick.slice(1)}`
+            : pick;
+
+        await socket.sendMessage(sender, {
+            text: `💐 *ᴄᴏᴍᴘʟɪᴍᴇɴᴛ*\n\n${target}\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}comp`, buttonText: { displayText: '💐 ᴀɴᴏᴛʜᴇʀ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Compliment] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
 //delete case 
 case 'delete':
 case 'del':
@@ -8277,6 +8527,65 @@ case 'timezone': {
             ],
             headerType: 1
         }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+// Case: calc / calculate / math - Evaluate a math expression
+case 'calc':
+case 'calculate':
+case 'math': {
+    try {
+        if (!args.length) {
+            await socket.sendMessage(sender, {
+                text: `🧮 *ᴄᴀʟᴄᴜʟᴀᴛᴏʀ*\n\nᴇᴠᴀʟᴜᴀᴛᴇ ᴀ ᴍᴀᴛʜ ᴇxᴘʀᴇssɪᴏɴ.\n\n*ᴜsᴀɢᴇ:* \`${prefix}calc <expression>\`\n\n*ᴇxᴀᴍᴘʟᴇs:*\n• \`${prefix}calc 25 * 4\`\n• \`${prefix}calc (100 + 50) / 3\`\n• \`${prefix}calc 2 ** 10\`\n• \`${prefix}calc Math.sqrt(144)\`\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}calc 25 * 4`, buttonText: { displayText: '25 × 4' }, type: 1 },
+                    { buttonId: `${prefix}calc Math.sqrt(144)`, buttonText: { displayText: '√144' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🧮', key: msg.key } });
+
+        // Sanitize input: allow digits, operators, parentheses, dot, common Math functions, spaces
+        const expr = args.join(' ')
+            .replace(/[^0-9+\-*/().%, \tMathsqrtpowabsceilflooroundrndmlogIE]/g, '')
+            .trim();
+
+        if (!expr) {
+            await socket.sendMessage(sender, {
+                text: `❌ *ɪɴᴠᴀʟɪᴅ ᴇxᴘʀᴇssɪᴏɴ*\n\nᴘʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ ᴍᴀᴛʜ ᴇxᴘʀᴇssɪᴏɴ.`,
+                quoted: msg
+            });
+            break;
+        }
+
+        const result = Function('"use strict"; return (' + expr + ')')();
+
+        if (typeof result !== 'number' || !isFinite(result)) {
+            throw new Error('Invalid result');
+        }
+
+        await socket.sendMessage(sender, {
+            text: `🧮 *ᴄᴀʟᴄᴜʟᴀᴛᴏʀ*\n\n📥 *ɪɴᴘᴜᴛ:* \`${args.join(' ')}\`\n📤 *ʀᴇsᴜʟᴛ:* \`${result.toLocaleString()}\`\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}calc`, buttonText: { displayText: '🧮 ᴄᴀʟᴄᴜʟᴀᴛᴇ ᴀɢᴀɪɴ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Calc] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ɪɴᴠᴀʟɪᴅ ᴇxᴘʀᴇssɪᴏɴ*\n\n\`${args.join(' ')}\`\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
         await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
@@ -9776,7 +10085,66 @@ case 'profilepic': {
                     break;
                 }
 /// case leave 
+// Case: hidetag / htag / stag / silenttag - Silently mention all group members
+case 'hidetag':
+case 'htag':
+case 'stag':
+case 'silenttag': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*\n\nᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴄᴀɴ ᴏɴʟʏ ʙᴇ ᴜsᴇᴅ ɪɴ ɢʀᴏᴜᴘs.',
+                quoted: msg
+            });
+            break;
+        }
 
+        if (!isSenderGroupAdmin && !isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*\n\nᴏɴʟʏ ɢʀᴏᴜᴘ ᴀᴅᴍɪɴs ᴄᴀɴ ᴜsᴇ ʜɪᴅᴇᴛᴀɢ.',
+                quoted: msg
+            });
+            break;
+        }
+
+        if (!args.length) {
+            await socket.sendMessage(sender, {
+                text: `👻 *ʜɪᴅᴇᴛᴀɢ*\n\nsɪʟᴇɴᴛʟʏ ɴᴏᴛɪғʏ ᴀʟʟ ᴍᴇᴍʙᴇʀs.\n\n*ᴜsᴀɢᴇ:* \`${prefix}hidetag <message>\`\n\n*ᴇxᴀᴍᴘʟᴇ:* \`${prefix}hidetag ɪᴍᴘᴏʀᴛᴀɴᴛ ᴍᴇᴇᴛɪɴɢ!\`\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '👻', key: msg.key } });
+
+        const groupMetadata = await socket.groupMetadata(from);
+        const participants = groupMetadata?.participants || [];
+
+        if (!participants.length) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ғᴀɪʟᴇᴅ*\n\nᴄᴏᴜʟᴅ ɴᴏᴛ ғᴇᴛᴄʜ ɢʀᴏᴜᴘ ᴍᴇᴍʙᴇʀs.',
+                quoted: msg
+            });
+            break;
+        }
+
+        const mentions = participants.map(p => p.id);
+        const text = args.join(' ');
+
+        await socket.sendMessage(from, { text, mentions });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Hidetag] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
 case 'leave': {
   try {
     // Add reaction immediately
@@ -10357,6 +10725,193 @@ case 'members': {
     break;
 }
 
+// Case: livescore - Live football scores
+case 'livescore': {
+    try {
+        await socket.sendMessage(sender, { react: { text: '⚽', key: msg.key } });
+        
+        const res = await axios.get('https://api.sofascore.com/api/v1/sport/football/events/live', {
+            headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+            timeout: 12000
+        });
+        const events = res.data?.events?.slice(0, 10) || [];
+        if (!events.length) {
+            await socket.sendMessage(sender, {
+                text: `⚽ *ʟɪᴠᴇ sᴄᴏʀᴇs*\n\nɴᴏ ʟɪᴠᴇ ᴍᴀᴛᴄʜᴇs ʀɪɢʜᴛ ɴᴏᴡ.\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+            break;
+        }
+        const list = events.map(e => {
+            const h = e.homeTeam?.name || '?';
+            const a = e.awayTeam?.name || '?';
+            const hs = e.homeScore?.current ?? '-';
+            const as = e.awayScore?.current ?? '-';
+            return `⚽ *${h}* ${hs} - ${as} *${a}*`;
+        }).join('\n');
+        await socket.sendMessage(sender, {
+            text: `⚽ *ʟɪᴠᴇ sᴄᴏʀᴇs*\n\n${list}\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+    } catch {
+        await socket.sendMessage(sender, {
+            text: `⚽ *ʟɪᴠᴇ sᴄᴏʀᴇs*\n\nᴄᴏᴜʟᴅ ɴᴏᴛ ғᴇᴛᴄʜ ᴅᴀᴛᴀ.\n🔗 https://www.sofascore.com\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+    }
+    break;
+}
+
+// Case: sportnews - Sports news
+case 'sportnews': {
+    try {
+        const q = args.join(' ') || 'football';
+        await socket.sendMessage(sender, { react: { text: '🏆', key: msg.key } });
+        
+        const res = await axios.get(`https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&language=en&sortBy=publishedAt&pageSize=5&apiKey=demo`, { timeout: 10000 });
+        const articles = res.data?.articles || [];
+        if (!articles.length) throw new Error('no articles');
+        const list = articles.slice(0, 5).map((a, i) =>
+            `*${i + 1}.* ${a.title}\n   📰 ${a.source?.name}`
+        ).join('\n\n');
+        await socket.sendMessage(sender, {
+            text: `🏆 *sᴘᴏʀᴛs ɴᴇᴡs:* ${q}\n\n${list}\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+    } catch {
+        await socket.sendMessage(sender, {
+            text: `🏆 *sᴘᴏʀᴛs ɴᴇᴡs*\n\n📰 ᴄʜᴇᴄᴋ:\n• https://www.bbc.com/sport\n• https://www.espn.com\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+    }
+    break;
+}
+
+// Case: standings - League standings
+case 'standings': {
+    try {
+        const league = args.join(' ') || 'premier league';
+        await socket.sendMessage(sender, { react: { text: '🏆', key: msg.key } });
+        
+        const res = await axios.get(`https://api.siputzx.my.id/api/sports/standings?league=${encodeURIComponent(league)}`, { timeout: 12000 });
+        const teams = res.data?.data?.slice(0, 10) || [];
+        if (!teams.length) throw new Error('no data');
+        const list = teams.map(t =>
+            `${t.rank || '?'}. ${t.name || t.team} | Pts: ${t.points}`
+        ).join('\n');
+        await socket.sendMessage(sender, {
+            text: `🏆 *sᴛᴀɴᴅɪɴɢs: ${league}*\n\n${list}\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+    } catch {
+        await socket.sendMessage(sender, {
+            text: `🏆 *${args.join(' ') || 'premier league'} sᴛᴀɴᴅɪɴɢs*\n\n🔗 https://www.flashscore.com\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+    }
+    break;
+}
+
+// Case: topscorers - Top goal scorers
+case 'topscorers': {
+    try {
+        const league = args.join(' ') || 'premier league';
+        await socket.sendMessage(sender, { react: { text: '⚽', key: msg.key } });
+        
+        const res = await axios.get(`https://api.siputzx.my.id/api/sports/topscorers?league=${encodeURIComponent(league)}`, { timeout: 12000 });
+        const players = res.data?.data?.slice(0, 10) || [];
+        if (!players.length) throw new Error('no data');
+        const list = players.map((p, i) =>
+            `*${i + 1}.* ${p.name || p.player} (${p.team}) — ⚽ ${p.goals}`
+        ).join('\n');
+        await socket.sendMessage(sender, {
+            text: `⚽ *ᴛᴏᴘ sᴄᴏʀᴇʀs: ${league}*\n\n${list}\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+    } catch {
+        await socket.sendMessage(sender, {
+            text: `⚽ *ᴛᴏᴘ sᴄᴏʀᴇʀs:s ${args.join(' ') || 'premier league'}*\n\n🔗 https://www.whoscored.com\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+    }
+    break;
+}
+
+// Case: upcomingmatches - Team upcoming matches
+case 'upcomingmatches': {
+    try {
+        const team = args.join(' ') || 'chelsea';
+        await socket.sendMessage(sender, { react: { text: '📅', key: msg.key } });
+        
+        const res = await axios.get(`https://api.sofascore.com/api/v1/team/search/${encodeURIComponent(team)}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 10000
+        });
+        const teamId = res.data?.teams?.[0]?.id;
+        if (teamId) {
+            const matches = await axios.get(`https://api.sofascore.com/api/v1/team/${teamId}/events/next/0`, {
+                headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 10000
+            });
+            const events = matches.data?.events?.slice(0, 5) || [];
+            if (events.length) {
+                const list = events.map(e => {
+                    const d = new Date(e.startTimestamp * 1000);
+                    return `📅 ${d.toDateString()} | ${e.homeTeam?.name} vs ${e.awayTeam?.name}`;
+                }).join('\n');
+                await socket.sendMessage(sender, {
+                    text: `📅 *ᴜᴘᴄᴏᴍɪɴɢ: ${team.toUpperCase()}*\n\n${list}\n\n> ${config.BOT_FOOTER}`,
+                    quoted: msg
+                });
+                break;
+            }
+        }
+        throw new Error('no matches');
+    } catch {
+        await socket.sendMessage(sender, {
+            text: `📅 *ᴜᴘᴄᴏᴍɪɴɢ: ${args.join(' ') || 'chelsea'}*\n\n🔗 https://www.sofascore.com\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+    }
+    break;
+}
+
+// Case: gamehistory - Team match history
+case 'gamehistory': {
+    try {
+        const team = args.join(' ') || 'chelsea';
+        await socket.sendMessage(sender, { react: { text: '📋', key: msg.key } });
+        
+        const res = await axios.get(`https://api.sofascore.com/api/v1/team/search/${encodeURIComponent(team)}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 10000
+        });
+        const teamId = res.data?.teams?.[0]?.id;
+        if (teamId) {
+            const hist = await axios.get(`https://api.sofascore.com/api/v1/team/${teamId}/events/last/0`, {
+                headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 10000
+            });
+            const events = hist.data?.events?.slice(-5).reverse() || [];
+            if (events.length) {
+                const list = events.map(e => {
+                    const d = new Date(e.startTimestamp * 1000);
+                    const hs = e.homeScore?.current ?? '-';
+                    const as = e.awayScore?.current ?? '-';
+                    return `📅 ${d.toDateString()}\n   ${e.homeTeam?.name} ${hs}-${as} ${e.awayTeam?.name}`;
+                }).join('\n\n');
+                await socket.sendMessage(sender, {
+                    text: `📋 *ʜɪsᴛᴏʀʏ: ${team.toUpperCase()}*\n\n${list}\n\n> ${config.BOT_FOOTER}`,
+                    quoted: msg
+                });
+                break;
+            }
+        }
+        throw new Error('no history');
+    } catch {
+        await socket.sendMessage(sender, {
+            text: `📋 *ʜɪsᴛᴏʀʏ: ${args.join(' ') || 'chelsea'}*\n\n🔗 https://www.sofascore.com\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+    }
+    break;
+}
                 // Case: open - Unlock group (allow all members to send messages)
 case 'open': {
     await socket.sendMessage(sender, { react: { text: '🔓', key: msg.key } });
@@ -10491,6 +11046,197 @@ case 'close': {
                     }
                     break;
                 }
+                // Case: vcfgen / savecontacts / exportvcf / contactsave - Generate VCF from mentioned users
+case 'vcfgen':
+case 'savecontacts':
+case 'exportvcf':
+case 'contactsave': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, {
+                text: `❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*\n\nᴜsᴇ \`${prefix}vcfnumber <phone>\` ғᴏʀ sᴘᴇᴄɪғɪᴄ ɴᴜᴍʙᴇʀs.`,
+                quoted: msg
+            });
+            break;
+        }
+
+        const mentioned = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+
+        if (!mentioned.length) {
+            await socket.sendMessage(sender, {
+                text: `📇 *ᴠᴄғ ɢᴇɴᴇʀᴀᴛᴏʀ*\n\nᴛᴀɢ ᴜsᴇʀs ᴛᴏ ᴄʀᴇᴀᴛᴇ ᴀ ᴠᴄғ ғɪʟᴇ.\n\n*ᴜsᴀɢᴇ:* \`${prefix}vcfgen @user1 @user2\`\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📇', key: msg.key } });
+
+        const vcards = [];
+        for (const mJid of mentioned) {
+            const num = mJid.split('@')[0];
+            const name = `Contact ${num}`;
+            vcards.push(`BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nTEL;TYPE=CELL:+${num}\nEND:VCARD`);
+        }
+
+        const vcfContent = vcards.join('\n');
+        const buf = Buffer.from(vcfContent, 'utf8');
+
+        await socket.sendMessage(sender, {
+            document: buf,
+            mimetype: 'text/x-vcard',
+            fileName: `contacts_${vcards.length}.vcf`,
+            caption: `📇 *ᴠᴄғ ɢᴇɴᴇʀᴀᴛᴇᴅ — ${vcards.length} ᴄᴏɴᴛᴀᴄᴛ(s)*\n\n> ${config.BOT_FOOTER}`
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.error('[VCF] Error:', e.message);
+        await socket.sendMessage(sender, { text: `❌ ${e.message}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+
+// Case: vcfnumber - Generate VCF from phone numbers
+case 'vcfnumber': {
+    try {
+        const numbers = args.filter(a => /^\+?\d{7,15}$/.test(a.replace(/[\s\-()]/g, '')));
+        if (!numbers.length) {
+            await socket.sendMessage(sender, {
+                text: `📇 *ᴠᴄғ ғʀᴏᴍ ɴᴜᴍʙᴇʀ*\n\n*ᴜsᴀɢᴇ:* \`${prefix}vcfnumber 254712345678\`\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📇', key: msg.key } });
+
+        const vcards = [];
+        for (const raw of numbers) {
+            const phone = raw.replace(/[\s\-()+]/g, '');
+            vcards.push(`BEGIN:VCARD\nVERSION:3.0\nFN:Contact +${phone}\nTEL;TYPE=CELL:+${phone}\nEND:VCARD`);
+        }
+
+        const vcfContent = vcards.join('\n');
+        const buf = Buffer.from(vcfContent, 'utf8');
+
+        await socket.sendMessage(sender, {
+            document: buf,
+            mimetype: 'text/x-vcard',
+            fileName: `contacts_${numbers.length}.vcf`,
+            caption: `📇 *ᴠᴄғ ɢᴇɴᴇʀᴀᴛᴇᴅ — ${numbers.length} ᴄᴏɴᴛᴀᴄᴛ(s)*\n\n> ${config.BOT_FOOTER}`
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.error('[VCF] Error:', e.message);
+        await socket.sendMessage(sender, { text: `❌ ${e.message}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+
+// Case: vcfgroup - Generate VCF from all group members
+case 'vcfgroup': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📇', key: msg.key } });
+
+        const meta = await socket.groupMetadata(from);
+        const participants = meta?.participants || [];
+        if (!participants.length) {
+            await socket.sendMessage(sender, { text: '❌ ᴄᴏᴜʟᴅ ɴᴏᴛ ғᴇᴛᴄʜ ᴍᴇᴍʙᴇʀs.', quoted: msg });
+            break;
+        }
+
+        const vcards = [];
+        for (const p of participants) {
+            const num = p.id.split('@')[0];
+            const name = `Member ${num}`;
+            vcards.push(`BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nTEL;TYPE=CELL:+${num}\nEND:VCARD`);
+        }
+
+        const vcfContent = vcards.join('\n');
+        const buf = Buffer.from(vcfContent, 'utf8');
+        const groupName = (meta.subject || 'group').replace(/[^a-zA-Z0-9]/g, '_');
+
+        await socket.sendMessage(sender, {
+            document: buf,
+            mimetype: 'text/x-vcard',
+            fileName: `${groupName}_contacts.vcf`,
+            caption: `📇 *ᴠᴄғ ɢᴇɴᴇʀᴀᴛᴇᴅ — ${vcards.length} ᴄᴏɴᴛᴀᴄᴛ(s)*\n\n> ${config.BOT_FOOTER}`
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.error('[VCF] Error:', e.message);
+        await socket.sendMessage(sender, { text: `❌ ${e.message}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+
+// Case: vcfread / readvcf / vcfview - Read VCF file content
+case 'vcfread':
+case 'readvcf':
+case 'vcfview': {
+    try {
+        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        const docMsg = quotedMsg?.documentMessage || msg.message?.documentMessage;
+
+        if (!docMsg) {
+            await socket.sendMessage(sender, {
+                text: `📇 *ᴠᴄғ ʀᴇᴀᴅᴇʀ*\n\nʀᴇᴘʟʏ ᴛᴏ ᴀ .ᴠᴄғ ғɪʟᴇ ᴛᴏ ᴠɪᴇᴡ ɪᴛs ᴄᴏɴᴛᴇɴᴛs.\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📇', key: msg.key } });
+
+        const stream = await downloadContentFromMessage(docMsg, 'document');
+        const chunks = [];
+        for await (const chunk of stream) chunks.push(chunk);
+        const buffer = Buffer.concat(chunks);
+        const vcfText = buffer.toString('utf8');
+
+        // Parse contacts
+        const cards = vcfText.split(/(?=BEGIN:VCARD)/i).filter(c => c.trim());
+        if (!cards.length) {
+            await socket.sendMessage(sender, { text: '❌ ɴᴏ ᴄᴏɴᴛᴀᴄᴛs ғᴏᴜɴᴅ.', quoted: msg });
+            break;
+        }
+
+        const contacts = cards.slice(0, 30).map(card => {
+            const fnMatch = card.match(/^FN[;:](.+)$/mi);
+            const telMatch = card.match(/^TEL[^:]*:(.+)$/mi);
+            const name = (fnMatch?.[1] || 'Unknown').trim();
+            const phone = (telMatch?.[1] || 'N/A').trim();
+            return `📛 ${name}\n📞 ${phone}`;
+        }).join('\n\n');
+
+        await socket.sendMessage(sender, {
+            text: `📇 *ᴠᴄғ ᴄᴏɴᴛᴇɴᴛs* — ${cards.length} ᴄᴏɴᴛᴀᴄᴛ(s)\n\n${contacts}\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.error('[VCF] Error:', e.message);
+        await socket.sendMessage(sender, { text: `❌ ${e.message}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
                 // Case: join - Join a group via invite link
                 case 'join': {
                     if (!isOwner) {
