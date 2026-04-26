@@ -5,6 +5,7 @@ const { exec } = require('child_process');
 const router = express.Router();
 const fetch = require('node-fetch');
 const pino = require('pino');
+const vm = require('vm');
 const yts = require("yt-search");
 const cheerio = require('cheerio');
 const BASE_URL = 'https://noobs-api.top';
@@ -57,7 +58,7 @@ const config = {
     version: '1.0.0',
     OWNER_NUMBER: '254762673217',
     OWNER_NAME: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs🎀',
-    BOT_FOOTER: '> ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs',
+    BOT_FOOTER: 'ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs',
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbBuCXcAO7RByB99ce3R'
 };
 
@@ -223,6 +224,33 @@ async function storeMessage(sock, message) {
     }
 }
 
+// ============ GROUP STATUS HELPER (for togstatus command) ============
+function hexToArgb(hex) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return ((0xff << 24) | (r << 16) | (g << 8) | b) >>> 0;
+}
+
+async function groupStatusPost(sock, jid, content) {
+    const secret = crypto.randomBytes(32);
+    const innerMsg = typeof content.toJSON === 'function' ? content.toJSON() : content;
+
+    const fullContent = {
+        messageContextInfo: { messageSecret: secret },
+        groupStatusMessageV2: {
+            message: {
+                ...innerMsg,
+                messageContextInfo: { messageSecret: secret }
+            }
+        }
+    };
+
+    const msg = generateWAMessageFromContent(jid, fullContent, {});
+    await sock.relayMessage(jid, msg.message, { messageId: msg.key.id });
+    return msg;
+}
 // Handle message deletion
 async function handleMessageRevocation(sock, revocationMessage) {
     try {
@@ -1449,8 +1477,104 @@ case 'song': {
     }
     break;
 }
-//case emoji mix 
+// Case: gitclone - Download a GitHub repository as a ZIP file
+case 'gitclone': {
+    try {
+        if (!args[0]) {
+            await socket.sendMessage(sender, {
+                text: `📦 *GitHub Downloader*\n\nDownload any GitHub repository as a ZIP file.\n\n*Usage:* \`${prefix}gitclone <github_url>\`\n\n*Examples:*\n• \`${prefix}gitclone https://github.com/WhiskeySockets/Baileys\`\n• \`${prefix}gitclone https://github.com/adiwajshing/Baileys\``,
+                buttons: [
+                    { buttonId: `${prefix}gitclone https://github.com/WhiskeySockets/Baileys`, buttonText: { displayText: '📦 BAILEYS' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
 
+        const githubUrl = args[0];
+        const GH_REGEX = /(?:https|git)(?::\/\/|@)github\.com[\/:]([^\/:]+)\/(.+)/i;
+
+        if (!GH_REGEX.test(githubUrl)) {
+            await socket.sendMessage(sender, {
+                text: `⚠️ *Invalid GitHub Link*\n\nPlease provide a valid GitHub repository URL.\n\n*Example:* \`${prefix}gitclone https://github.com/user/repo\``,
+                buttons: [
+                    { buttonId: `${prefix}gitclone`, buttonText: { displayText: '🔄 TRY AGAIN' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📦', key: msg.key } });
+
+        const [, user, repo] = githubUrl.match(GH_REGEX);
+        const cleanRepo = repo.replace(/\.git$/, '');
+        const zipUrl = `https://api.github.com/repos/${user}/${cleanRepo}/zipball`;
+
+        // Send fetching message
+        const fetchingMsg = await socket.sendMessage(sender, {
+            text: `📦 *Fetching Repository...*\n\n🔗 *Repo:* ${user}/${cleanRepo}\n⏳ Please wait...`,
+            quoted: msg
+        });
+
+        try {
+            // Fetch the repository ZIP
+            const response = await fetch(zipUrl, { 
+                method: 'HEAD',
+                redirect: 'follow'
+            });
+            
+            const cd = response.headers.get('content-disposition') || '';
+            const filename = cd.match(/attachment; filename=(.*)/)?.[1] || `${cleanRepo}.zip`;
+
+            // Delete fetching message
+            try { await socket.sendMessage(sender, { delete: fetchingMsg.key }); } catch {}
+
+            // Send the ZIP file
+            await socket.sendMessage(sender, {
+                document: { url: zipUrl },
+                fileName: filename,
+                mimetype: 'application/zip',
+                caption: `📦 *Repository Downloaded!*\n\n` +
+                         `👤 *Owner:* ${user}\n` +
+                         `📂 *Repo:* ${cleanRepo}\n` +
+                         `📁 *File:* ${filename}\n` +
+                         `🔗 *URL:* https://github.com/${user}/${cleanRepo}\n\n` +
+                         `> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `https://github.com/${user}/${cleanRepo}`, buttonText: { displayText: '🔗 VIEW REPO' }, type: 1 },
+                    { buttonId: `${prefix}gitclone`, buttonText: { displayText: '📦 DOWNLOAD MORE' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+
+            await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+        } catch (fetchError) {
+            // Delete fetching message
+            try { await socket.sendMessage(sender, { delete: fetchingMsg.key }); } catch {}
+
+            throw fetchError;
+        }
+
+    } catch (err) {
+        console.error('[GitClone] Error:', err.message);
+        
+        await socket.sendMessage(sender, {
+            text: `❌ *Download Failed*\n\n${err.message}\n\n*Note:* Make sure the repository exists and is public.\n\n*Try:* \`${prefix}gitclone https://github.com/user/repo\``,
+            buttons: [
+                { buttonId: `${prefix}gitclone ${args[0] || ''}`, buttonText: { displayText: '🔄 RETRY' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
 // Case: emojimix / mixemoji / emojiblend - Mix two emojis together
 case 'emojimix':
 case 'mixemoji':
@@ -1552,6 +1676,97 @@ case 'emojiblend': {
             ],
             headerType: 1
         }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+// Case: eval / exec / run - Execute JavaScript code (owner only)
+case 'eval':
+case 'exec':
+case 'run': {
+    try {
+        if (!isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴏᴡɴᴇʀ ᴏɴʟʏ*\n\nᴏɴʟʏ ᴛʜᴇ ʙᴏᴛ ᴏᴡɴᴇʀ ᴄᴀɴ ᴇxᴇᴄᴜᴛᴇ ᴄᴏᴅᴇ.',
+                quoted: msg
+            });
+            break;
+        }
+
+        const code = args.join(' ').trim();
+        
+        if (!code) {
+            await socket.sendMessage(sender, {
+                text: `⚠️ *ᴇᴠᴀʟ*\n\nᴘʀᴏᴠɪᴅᴇ ᴄᴏᴅᴇ ᴛᴏ ᴇxᴇᴄᴜᴛᴇ.\n\n*ᴇxᴀᴍᴘʟᴇ:*\n\`${prefix}eval 2 + 2\`\n\`${prefix}eval socket.user.id\`\n\`${prefix}eval Object.keys(msg.message)\``,
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '⚡', key: msg.key } });
+
+        const start = Date.now();
+        let result, isError = false;
+
+        try {
+            const sandbox = {
+                sock: socket,
+                msg,
+                sender,
+                from,
+                isGroup,
+                isOwner,
+                args,
+                command,
+                prefix,
+                config,
+                require,
+                console: { 
+                    log: (...a) => { result = a.join(' '); } 
+                },
+                global,
+                process,
+                os,
+                fs,
+                path,
+                axios,
+                crypto,
+                moment
+            };
+            
+            const raw = vm.runInNewContext(
+                `(async () => { return (${code}) })()`,
+                sandbox,
+                { timeout: 8000 }
+            );
+            result = await raw;
+        } catch (e) {
+            result = e.message;
+            isError = true;
+        }
+
+        const elapsed = Date.now() - start;
+        const label = isError ? '❌ ᴇʀʀᴏʀ' : '✅ ʀᴇsᴜʟᴛ';
+        const output = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+        const trimmed = output.length > 3000 ? output.slice(0, 3000) + '\n...[truncated]' : output;
+
+        await socket.sendMessage(sender, {
+            text: `*${label}* (${elapsed}ms)\n\`\`\`\n${trimmed}\n\`\`\`\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}eval`, buttonText: { displayText: '⚡ ʀᴜɴ ᴀɢᴀɪɴ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: isError ? '❌' : '✅', key: msg.key } });
+
+    } catch (err) {
+        console.error('[Eval] Error:', err.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ᴇᴠᴀʟ ғᴀɪʟᴇᴅ*\n\n${err.message}`,
+            quoted: msg
+        });
         await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
@@ -1877,6 +2092,261 @@ case 'gstatus': {
             ],
             headerType: 1
         }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+// Case: togstatus / swgc / groupstatus - Send text/image/video/audio as group status
+case 'togstatus':
+case 'swgc':
+case 'groupstatus': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*\n\nᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴄᴀɴ ᴏɴʟʏ ʙᴇ ᴜsᴇᴅ ɪɴ ɢʀᴏᴜᴘs.',
+                quoted: msg
+            });
+            break;
+        }
+
+        // Parse args: caption|color|groupUrl
+        const raw = args.join(' ').trim();
+        let [caption, color, groupUrl] = raw.split('|').map(v => v?.trim());
+
+        // Resolve target group
+        let targetGroupId = from;
+        if (groupUrl) {
+            try {
+                const code = groupUrl.split('/').pop().split('?')[0];
+                const info = await socket.groupGetInviteInfo(code);
+                targetGroupId = info.id;
+            } catch {
+                await socket.sendMessage(sender, {
+                    text: '❌ ɪɴᴠᴀʟɪᴅ ɢʀᴏᴜᴘ ʟɪɴᴋ ᴏʀ ʙᴏᴛ ɪs ɴᴏᴛ ɪɴ ᴛʜᴀᴛ ɢʀᴏᴜᴘ.',
+                    quoted: msg
+                });
+                break;
+            }
+        }
+
+        // Detect quoted message
+        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage ||
+            (msg.message?.imageMessage ? msg.message : null) ||
+            (msg.message?.videoMessage ? msg.message : null) ||
+            (msg.message?.audioMessage ? msg.message : null);
+
+        // Color map
+        const COLORS = {
+            blue: '#34B7F1',
+            green: '#25D366',
+            yellow: '#FFD700',
+            orange: '#FF8C00',
+            red: '#FF3B30',
+            purple: '#9C27B0',
+            gray: '#9E9E9E',
+            black: '#000000',
+            white: '#FFFFFF',
+            cyan: '#00BCD4'
+        };
+
+        const hasMedia = quoted && (quoted.imageMessage || quoted.videoMessage || quoted.audioMessage);
+
+        // ── TEXT STATUS ──
+        if (!hasMedia) {
+            if (!caption) {
+                await socket.sendMessage(sender, {
+                    text: `📝 *ɢʀᴏᴜᴘ sᴛᴀᴛᴜs*\n\n` +
+                          `• \`${prefix}togstatus caption|color\`\n` +
+                          `• \`${prefix}togstatus |blue\`\n` +
+                          `• ʀᴇᴘʟʏ ᴛᴏ ɪᴍᴀɢᴇ/ᴠɪᴅᴇᴏ/ᴀᴜᴅɪᴏ\n\n` +
+                          `🎨 *ᴄᴏʟᴏʀs:* blue, green, yellow, orange, red, purple, gray, black, white, cyan\n\n` +
+                          `> ${config.BOT_FOOTER}`,
+                    quoted: msg
+                });
+                break;
+            }
+
+            const bgHex = COLORS[color?.toLowerCase()] || COLORS.blue;
+
+            await groupStatus(socket, targetGroupId, {
+                extendedTextMessage: {
+                    text: caption,
+                    backgroundArgb: hexToArgb(bgHex),
+                    font: 0
+                }
+            });
+
+            await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📤', key: msg.key } });
+
+        // ── IMAGE STATUS ──
+        if (quoted.imageMessage) {
+            const mediaMsg = quoted.imageMessage || quoted;
+            const stream = await downloadContentFromMessage(mediaMsg, 'image');
+            let buffer = Buffer.alloc(0);
+            for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+            const content = await generateWAMessageContent(
+                { image: buffer, caption: caption || '' },
+                { upload: socket.waUploadToServer }
+            );
+            await groupStatus(socket, targetGroupId, content);
+            await socket.sendMessage(sender, {
+                text: '✅ *ɪᴍᴀɢᴇ sᴛᴀᴛᴜs sᴇɴᴛ!*',
+                quoted: msg
+            });
+        }
+
+        // ── VIDEO STATUS ──
+        else if (quoted.videoMessage) {
+            const mediaMsg = quoted.videoMessage || quoted;
+            const stream = await downloadContentFromMessage(mediaMsg, 'video');
+            let buffer = Buffer.alloc(0);
+            for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+            const content = await generateWAMessageContent(
+                { video: buffer, caption: caption || '' },
+                { upload: socket.waUploadToServer }
+            );
+            await groupStatus(socket, targetGroupId, content);
+            await socket.sendMessage(sender, {
+                text: '✅ *ᴠɪᴅᴇᴏ sᴛᴀᴛᴜs sᴇɴᴛ!*',
+                quoted: msg
+            });
+        }
+
+        // ── AUDIO STATUS ──
+        else if (quoted.audioMessage) {
+            const mediaMsg = quoted.audioMessage || quoted;
+            const stream = await downloadContentFromMessage(mediaMsg, 'audio');
+            let buffer = Buffer.alloc(0);
+            for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+
+            const vn = await toVN(buffer);
+            const waveform = await generateWaveform(buffer);
+
+            const content = await generateWAMessageContent(
+                { audio: vn, mimetype: 'audio/ogg; codecs=opus', ptt: true },
+                { upload: socket.waUploadToServer }
+            );
+
+            if (content.audioMessage) {
+                content.audioMessage.waveform = Buffer.from(waveform, 'base64');
+            }
+
+            await groupStatus(socket, targetGroupId, content);
+            await socket.sendMessage(sender, {
+                text: '✅ *ᴀᴜᴅɪᴏ sᴛᴀᴛᴜs sᴇɴᴛ!*',
+                quoted: msg
+            });
+        }
+
+        else {
+            await socket.sendMessage(sender, {
+                text: '❌ ᴜɴsᴜᴘᴘᴏʀᴛᴇᴅ ᴍᴇᴅɪᴀ. ʀᴇᴘʟʏ ᴛᴏ ᴀɴ ɪᴍᴀɢᴇ, ᴠɪᴅᴇᴏ, ᴏʀ ᴀᴜᴅɪᴏ.',
+                quoted: msg
+            });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (err) {
+        console.error('[togstatus]', err);
+        await socket.sendMessage(sender, {
+            text: `❌ *sᴛᴀᴛᴜs ᴇʀʀᴏʀ:* ${err.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+// Case: mediafire / mf / mfdl - Get MediaFire direct download link
+case 'mediafire':
+case 'mf':
+case 'mfdl': {
+    try {
+        const url = args[0];
+        
+        if (!url || !url.includes('mediafire.com')) {
+            await socket.sendMessage(sender, {
+                text: `📁 *MediaFire Downloader*\n\nExtract direct download links from MediaFire.\n\n*Usage:* \`${prefix}mf <mediafire_url>\`\n\n*Example:*\n\`${prefix}mf https://www.mediafire.com/file/abc123/filename.zip/file\``,
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📁', key: msg.key } });
+
+        // Send processing message
+        await socket.sendMessage(sender, {
+            text: '⏳ *Extracting MediaFire link...*',
+            quoted: msg
+        });
+
+        const { data } = await axios.get(url, {
+            timeout: 15000,
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' 
+            }
+        });
+
+        // Try multiple patterns to find download link
+        let dlUrl = '';
+        let fileName = 'file';
+
+        // Pattern 1: Direct download link
+        const match1 = data.match(/href="(https:\/\/download\d+\.mediafire\.com[^"]+)"/);
+        if (match1) dlUrl = match1[1];
+
+        // Pattern 2: Alternative download link
+        if (!dlUrl) {
+            const match2 = data.match(/href="(https:\/\/download\d+\.mediafire\.com\/[^"]+)"/i);
+            if (match2) dlUrl = match2[1];
+        }
+
+        // Pattern 3: Another format
+        if (!dlUrl) {
+            const match3 = data.match(/(https:\/\/download\d+\.mediafire\.com\/[^\s"']+)/i);
+            if (match3) dlUrl = match3[1];
+        }
+
+        if (!dlUrl) {
+            throw new Error('Could not extract download link. File may be removed or private.');
+        }
+
+        // Try multiple patterns for filename
+        const nameMatch1 = data.match(/<div class="filename">([^<]+)<\/div>/);
+        const nameMatch2 = data.match(/class="dl-btn-label[^"]*">([^<]+)<\/span>/);
+        const nameMatch3 = data.match(/<title>([^<]+)<\/title>/);
+        
+        if (nameMatch1) fileName = nameMatch1[1].trim();
+        else if (nameMatch2) fileName = nameMatch2[1].trim();
+        else if (nameMatch3) fileName = nameMatch3[1].trim().replace('MediaFire', '').replace(/[-–—]/g, '').trim();
+
+        // Clean up filename
+        fileName = fileName.replace(/&amp;/g, '&').replace(/&#x27;/g, "'").replace(/&quot;/g, '"');
+
+        await socket.sendMessage(sender, {
+            text: `📁 *MediaFire Download*\n\n` +
+                  `📄 *File:* ${fileName}\n` +
+                  `🔗 *Link:* ${dlUrl}\n\n` +
+                  `> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[MediaFire] Error:', error.message);
+        
+        await socket.sendMessage(sender, {
+            text: `❌ *MediaFire Failed*\n\n${error.message}\n\n*Tips:*\n• Make sure the file is public\n• Check if the link is valid\n• File may have been removed`,
+            quoted: msg
+        });
+        
         await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
@@ -2736,7 +3206,83 @@ ${config.PREFIX}allmenu ᴛᴏ ᴠɪᴇᴡ ᴀʟʟ ᴄᴍᴅs
   break;
 }
 //logo menu 
+// Case: save / nitumie / statussave - Save a WhatsApp status
+case 'save':
+case 'nitumie':
+case 'statussave': {
+    try {
+        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        
+        if (!quoted) {
+            await socket.sendMessage(sender, {
+                text: `📌 *sᴀᴠᴇ sᴛᴀᴛᴜs*\n\nʀᴇᴘʟʏ ᴛᴏ ᴀ sᴛᴀᴛᴜs ɪᴍᴀɢᴇ ᴏʀ ᴠɪᴅᴇᴏ ᴡɪᴛʜ \`${prefix}save\` ᴛᴏ sᴀᴠᴇ ɪᴛ.\n\n*ᴜsᴀɢᴇ:* ʀᴇᴘʟʏ ᴛᴏ sᴛᴀᴛᴜs + \`${prefix}save\``,
+                quoted: msg
+            });
+            break;
+        }
 
+        const isImage = !!quoted.imageMessage;
+        const isVideo = !!quoted.videoMessage;
+
+        if (!isImage && !isVideo) {
+            await socket.sendMessage(sender, {
+                text: `❌ *ᴜɴsᴜᴘᴘᴏʀᴛᴇᴅ ᴍᴇᴅɪᴀ*\n\nᴏɴʟʏ *ɪᴍᴀɢᴇ* ᴀɴᴅ *ᴠɪᴅᴇᴏ* sᴛᴀᴛᴜsᴇs ᴄᴀɴ ʙᴇ sᴀᴠᴇᴅ.`,
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } });
+
+        const mediaType = isImage ? 'image' : 'video';
+        const msgContent = isImage ? quoted.imageMessage : quoted.videoMessage;
+
+        // Download media
+        const stream = await downloadContentFromMessage(msgContent, mediaType);
+        let buffer = Buffer.alloc(0);
+        for await (const chunk of stream) {
+            buffer = Buffer.concat([buffer, chunk]);
+        }
+
+        const caption = msgContent.caption || `📥 *sᴛᴀᴛᴜs sᴀᴠᴇᴅ ʙʏ ${config.OWNER_NAME}*`;
+
+        // Send the saved status back
+        await socket.sendMessage(sender, {
+            [mediaType]: buffer,
+            caption: `${caption}\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}save`, buttonText: { displayText: '💾 sᴀᴠᴇ ᴍᴏʀᴇ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1,
+            contextInfo: {
+                externalAdReply: {
+                    title: 'sᴛᴀᴛᴜs sᴀᴠᴇᴅ ✅',
+                    body: `${config.OWNER_NAME} · sᴛᴀᴛᴜs ᴅᴏᴡɴʟᴏᴀᴅᴇʀ`,
+                    thumbnailUrl: config.RCD_IMAGE_PATH,
+                    mediaType: 1,
+                    renderLargerThumbnail: true
+                }
+            }
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (err) {
+        console.error('[StatusSave] Error:', err.message);
+        
+        await socket.sendMessage(sender, {
+            text: `❌ *ғᴀɪʟᴇᴅ ᴛᴏ sᴀᴠᴇ sᴛᴀᴛᴜs*\n\n${err.message}`,
+            buttons: [
+                { buttonId: `${prefix}save`, buttonText: { displayText: '🔄 ʀᴇᴛʀʏ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
 case 'logo': 
 case 'logomenu': {
     try {
@@ -3481,71 +4027,71 @@ case 'npm-stats': {
     break;
 }
 // Case: ping
-// Ping Command with Buttons - No Quality Indicators
-// Case: ping
-// Ping Command with Buttons - No Quality Indicators
-case 'ping':
-case 'p':
-case 'speed': {
+// Case: ping - Check bot response time and uptime
+case 'ping': {
     try {
-        // Send initial reaction
-        await socket.sendMessage(sender, { 
-            react: { text: '🌏', key: msg.key } 
+        await socket.sendMessage(sender, { react: { text: '🏓', key: msg.key } });
+
+        const start = performance.now();
+        
+        // Send initial ping message
+        const pingMsg = await socket.sendMessage(sender, {
+            text: '🏓 *ᴘɪɴɢɪɴɢ...*',
+            quoted: msg
         });
         
-        const startTime = Date.now();
+        const responseTime = (performance.now() - start).toFixed(2);
 
-        // Add a short delay for accuracy
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Calculate uptime
+        const startTime = socketCreationTime.get(number) || Date.now();
+        const uptime = Math.floor((Date.now() - startTime) / 1000);
+        const hours = Math.floor(uptime / 3600);
+        const minutes = Math.floor((uptime % 3600) / 60);
+        const seconds = Math.floor(uptime % 60);
 
-        const endTime = Date.now();
-        const ping = endTime - startTime;
+        // System info
+        const usedMemory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+        const totalMemory = Math.round(os.totalmem() / 1024 / 1024);
+        const platform = os.platform();
+        const nodeVersion = process.version;
 
-        // Send the ping result with buttons
-        await socket.sendMessage(sender, { 
-            text: `*👑 CASEYRHODES-MINI*\n\n` +
-                  `╭━━━━━━━━━━━━━━━━━━╮\n` +
-                  `┃ ⚡ *𝐏𝐢𝐧𝐠:* ${ping}ms\n` +
-                  `┃ 🕒 *𝐓𝐢𝐦𝐞:* ${new Date().toLocaleTimeString()}\n` +
-                  `╰━━━━━━━━━━━━━━━━━━╯\n\n` +
-                  `> *𝐏𝐨𝐰𝐞𝐫𝐞𝐝 𝐛𝐲 Caseyrhodes Tech*`,
-            footer: `⚡ 𝐏𝐢𝐧𝐠 𝐓𝐞𝐬𝐭 ⚡`,
+        // Delete ping message
+        try { await socket.sendMessage(sender, { delete: pingMsg.key }); } catch {}
+
+        const pingText = 
+            `🏓 *ᴘᴏɴɢ!*\n\n` +
+            `⏱ *ʀᴇsᴘᴏɴsᴇ:* ${responseTime} ᴍs\n` +
+            `⏳ *ᴜᴘᴛɪᴍᴇ:* ${hours}ʜ ${minutes}ᴍ ${seconds}s\n` +
+            `💾 *ʀᴀᴍ:* ${usedMemory}ᴍʙ / ${totalMemory}ᴍʙ\n` +
+            `🖥 *ᴘʟᴀᴛғᴏʀᴍ:* ${platform}\n` +
+            `📦 *ɴᴏᴅᴇ:* ${nodeVersion}\n\n` +
+            `> ${config.BOT_FOOTER}`;
+
+        await socket.sendMessage(sender, {
+            text: pingText,
             buttons: [
-                {
-                    buttonId: `${prefix}menu`,
-                    buttonText: { 
-                        displayText: '📂MENU' 
-                    },
-                    type: 1
-                },
-                {
-                    buttonId: `${prefix}repo`,
-                    buttonText: { 
-                        displayText: '📦 𝐑𝐄𝐏𝐎𝐒𝐈𝐓𝐎𝐑𝐘' 
-                    },
-                    type: 1
-                }
+                { buttonId: `${prefix}ping`, buttonText: { displayText: '🔄 ʀᴇғʀᴇsʜ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
             ],
-            headerType: 1,
-            forwardingScore: 1,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-                newsletterJid: '120363420261263259@newsletter',
-                newsletterName: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ🌟',
-                serverMessageId: -1
-            }
-        });
-        
-        // Send success reaction
-        await socket.sendMessage(sender, { 
-            react: { text: '✅', key: msg.key } 
-        });
-        
-    } catch (e) {
-        console.error('Ping command error:', e);
-        await socket.sendMessage(sender, { 
-            text: `❌ *An error occurred:* ${e.message}` 
+            headerType: 1
         }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Ping] Error:', error.message);
+        
+        // Fallback simple ping
+        const start = performance.now();
+        await socket.sendMessage(sender, {
+            text: `🏓 *ᴘᴏɴɢ!*\n\n⏱ *ʀᴇsᴘᴏɴsᴇ:* ${(performance.now() - start).toFixed(2)} ᴍs\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}ping`, buttonText: { displayText: '🔄 ʀᴇᴛʀʏ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
 }
@@ -4546,275 +5092,109 @@ case 'grouplist': {
                     }
                     break;
                     }
+// Case: tiktok / tt / ttdl / tiktokdl - Download TikTok video without watermark
 case 'tiktok':
 case 'tt':
+case 'ttdl':
 case 'tiktokdl': {
     try {
-        const axios = require('axios');
-        
-        // Extract query from message
-        const q = msg.message?.conversation || 
-                  msg.message?.extendedTextMessage?.text || 
-                  msg.message?.imageMessage?.caption || 
-                  msg.message?.videoMessage?.caption || '';
-        
-        const args = q.split(' ').slice(1);
-        const tiktokUrl = args[0];
+        const raw = args[0];
+        const url = raw?.match(/(https?:\/\/[^\s]+)/)?.[0];
 
-        if (!tiktokUrl || !tiktokUrl.includes("tiktok.com")) {
-            return await socket.sendMessage(sender, {
-                text: '❌ *Please provide a valid TikTok URL.*\nExample: .tiktok https://vm.tiktok.com/abc123',
-                buttons: [
-                    {
-                        buttonId: `${config.PREFIX}menu`,
-                        buttonText: { displayText: '📋 MENU' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${config.PREFIX}help`,
-                        buttonText: { displayText: '❓ HELP' },
-                        type: 1
-                    }
-                ]
-            }, { quoted: msg });
+        if (!url || !/tiktok\.com|vt\.tiktok\.com/.test(url)) {
+            await socket.sendMessage(sender, {
+                text: `❌ *Invalid TikTok URL!*\n\nExample: .tiktok https://vt.tiktok.com/ZS...\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+            break;
         }
 
-        // Send processing reaction
-        await socket.sendMessage(sender, {
-            react: {
-                text: "⏳",
-                key: msg.key
-            }
+        await socket.sendMessage(sender, { react: { text: '🎵', key: msg.key } });
+
+        const processingMsg = await socket.sendMessage(sender, {
+            text: '⏳ *Processing TikTok video...* (may take ~20 seconds)',
+            quoted: msg
         });
 
-        let data;
-        
-        // Try primary API
-        try {
-            const res = await axios.get(`https://api.nexoracle.com/downloader/tiktok-nowm?apikey=free_key@maher_apis&url=${encodeURIComponent(tiktokUrl)}`, {
-                timeout: 15000
-            });
-            if (res.data?.status === 200) data = res.data.result;
-        } catch (primaryError) {
-            console.log('Primary API failed, trying fallback...');
-        }
-
-        // Fallback API if primary fails
-        if (!data) {
-            try {
-                const fallback = await axios.get(`https://api.tikwm.com/?url=${encodeURIComponent(tiktokUrl)}&hd=1`, {
-                    timeout: 15000
-                });
-                if (fallback.data?.data) {
-                    const r = fallback.data.data;
-                    data = {
-                        title: r.title,
-                        author: {
-                            username: r.author.unique_id,
-                            nickname: r.author.nickname
-                        },
-                        metrics: {
-                            digg_count: r.digg_count,
-                            comment_count: r.comment_count,
-                            share_count: r.share_count,
-                            download_count: r.download_count
-                        },
-                        url: r.play,
-                        thumbnail: r.cover
-                    };
+        const ENDPOINTS = [
+            {
+                name: 'TikWM',
+                url:  (u) => `https://tikwm.com/api/?url=${encodeURIComponent(u)}`,
+                parse: (data) => {
+                    if (!data?.data?.play) return null;
+                    return { videoUrl: data.data.play, author: data.data.author, likes: data.data.digg_count };
                 }
-            } catch (fallbackError) {
-                console.error('Fallback API also failed');
+            },
+            {
+                name: 'Tiklydown',
+                url:  (u) => `https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(u)}`,
+                parse: (data) => {
+                    if (!data?.videoUrl) return null;
+                    return { videoUrl: data.videoUrl, author: data.author, likes: data.stats?.digg_count };
+                }
+            }
+        ];
+
+        let result = null;
+        for (const ep of ENDPOINTS) {
+            try {
+                const { data } = await axios.get(ep.url(url), {
+                    timeout: 25000,
+                    headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }
+                });
+                result = ep.parse(data);
+                if (result) { console.log(`[TikTok] Success via ${ep.name}`); break; }
+            } catch (e) {
+                console.warn(`[TikTok] ${ep.name} failed: ${e.message}`);
             }
         }
 
-        if (!data) {
-            return await socket.sendMessage(sender, {
-                text: '❌ *TikTok video not found or API services are down.*\nPlease try again later.',
+        // delete processing message
+        try { await socket.sendMessage(sender, { delete: processingMsg.key }); } catch {}
+
+        if (!result) {
+            await socket.sendMessage(sender, {
+                text: '❌ *All download methods failed.*\nThe video may be private or restricted.\n\n> ' + config.BOT_FOOTER,
                 buttons: [
-                    {
-                        buttonId: `${config.PREFIX}owner`,
-                        buttonText: { displayText: '👑 OWNER' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${config.PREFIX}menu`,
-                        buttonText: { displayText: '📋 MENU' },
-                        type: 1
-                    }
-                ]
+                    { buttonId: `${prefix}tt`, buttonText: { displayText: '🔄 ʀᴇᴛʀʏ' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+                ],
+                headerType: 1
             }, { quoted: msg });
+            break;
         }
 
-        const { title, author, url, metrics, thumbnail } = data;
+        // Download video directly as arraybuffer
+        const vidResponse = await axios.get(result.videoUrl, { responseType: 'arraybuffer', timeout: 30000 });
+        const videoBuffer = Buffer.from(vidResponse.data);
+        if (videoBuffer.length < 1024) throw new Error('Downloaded file too small');
 
-        const caption = `🎬 *TikTok Downloader*\n
-╭─❍ ᴄᴀsᴇʏʀʜᴏᴅᴇs-ᴡᴏʀʟᴅ ❍
-┊🎵 *Title:* ${title || 'No title'}
-┊👤 *Author:* @${author.username} (${author.nickname})
-┊❤️ *Likes:* ${metrics.digg_count || 0}
-┊💬 *Comments:* ${metrics.comment_count || 0}
-┊🔁 *Shares:* ${metrics.share_count || 0}
-┊📥 *Downloads:* ${metrics.download_count || 0}
-╰─❍
-> ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs xᴛᴇᴄʜ`;
+        const authorName = result.author?.nickname || result.author?.name || 'Unknown';
+        const likes = result.likes ?? 'N/A';
+        const caption = `🎵 *TikTok*  •  👤 ${authorName}  •  ❤️ ${likes}\n\n> ${config.BOT_FOOTER}`;
 
-        // Send thumbnail and info with buttons
         await socket.sendMessage(sender, {
-            image: { url: thumbnail },
+            video: videoBuffer,
             caption: caption,
             buttons: [
-                {
-                    buttonId: `${config.PREFIX}download_video`,
-                    buttonText: { displayText: '📥 DOWNLOAD VIDEO' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX}menu`,
-                    buttonText: { displayText: '📋 MAIN MENU' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX}fb`,
-                    buttonText: { displayText: '📘 FACEBOOK DL' },
-                    type: 1
-                }
-            ]
+                { buttonId: `${prefix}tt`, buttonText: { displayText: '🎵 ᴅᴏᴡɴʟᴏᴀᴅ ᴀɢᴀɪɴ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1
         }, { quoted: msg });
 
-        // Send downloading message with buttons
-        const loadingMsg = await socket.sendMessage(sender, {
-            text: '⏳ *Downloading video... Please wait*',
-            buttons: [
-                {
-                    buttonId: `${config.PREFIX}cancel`,
-                    buttonText: { displayText: '❌ CANCEL' },
-                    type: 1
-                }
-            ]
-        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
 
-        try {
-            // Download video
-            const videoResponse = await axios.get(url, {
-                responseType: 'arraybuffer',
-                timeout: 30000,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-            });
-
-            const videoBuffer = Buffer.from(videoResponse.data, 'binary');
-
-            // Send video with buttons
-            await socket.sendMessage(sender, {
-                video: videoBuffer,
-                caption: `🎥 *Video by* @${author.username}\n\n> ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs xᴛᴇᴄʜ`,
-                buttons: [
-                    {
-                        buttonId: `${config.PREFIX}play`,
-                        buttonText: { displayText: '🎵 DOWNLOAD AUDIO' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${config.PREFIX}tiktok ${tiktokUrl}`,
-                        buttonText: { displayText: '🔄 DOWNLOAD AGAIN' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${config.PREFIX}menu`,
-                        buttonText: { displayText: '📋 MAIN MENU' },
-                        type: 1
-                    }
-                ],
-                contextInfo: {
-                    mentionedJid: [msg.key.participant || msg.key.remoteJid],
-                    externalAdReply: {
-                        title: 'TikTok Download',
-                        body: `By @${author.username}`,
-                        mediaType: 2,
-                        sourceUrl: tiktokUrl,
-                        thumbnailUrl: thumbnail
-                    }
-                }
-            });
-
-            // Update loading message to success with buttons
-            await socket.sendMessage(sender, {
-                text: '✅ *Video downloaded successfully!*\n\nCheck above for your video! 🎬',
-                buttons: [
-                    {
-                        buttonId: `${config.PREFIX}ig`,
-                        buttonText: { displayText: '📸 INSTAGRAM DL' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${config.PREFIX}menu`,
-                        buttonText: { displayText: '📋 MAIN MENU' },
-                        type: 1
-                    }
-                ],
-                edit: loadingMsg.key
-            });
-
-            // Send success reaction
-            await socket.sendMessage(sender, {
-                react: {
-                    text: "✅",
-                    key: msg.key
-                }
-            });
-
-        } catch (downloadError) {
-            console.error('Video download failed:', downloadError);
-            await socket.sendMessage(sender, {
-                text: '❌ *Failed to download video.* The video might be too large or restricted.',
-                buttons: [
-                    {
-                        buttonId: `${config.PREFIX}owner`,
-                        buttonText: { displayText: '👑 REPORT ISSUE' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${config.PREFIX}menu`,
-                        buttonText: { displayText: '📋 MAIN MENU' },
-                        type: 1
-                    }
-                ]
-            }, { quoted: msg });
-        }
-
-    } catch (err) {
-        console.error("TikTok download error:", err);
-        
-        // Send error reaction
+    } catch (error) {
+        console.error('[TikTok] Error:', error.message);
         await socket.sendMessage(sender, {
-            react: {
-                text: "❌",
-                key: msg.key
-            }
-        });
-
-        await socket.sendMessage(sender, {
-            text: '❌ *Failed to process TikTok video.*\nPlease check the URL and try again.',
+            text: `❌ *TikTok download failed:* ${error.message}\n\n> ${config.BOT_FOOTER}`,
             buttons: [
-                {
-                    buttonId: `${config.PREFIX}owner`,
-                    buttonText: { displayText: '👑 GET HELP' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX}menu`,
-                    buttonText: { displayText: '📋 MAIN MENU' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX}help`,
-                    buttonText: { displayText: '❓ HOW TO USE' },
-                    type: 1
-                }
-            ]
+                { buttonId: `${prefix}tt`, buttonText: { displayText: '🔄 ʀᴇᴛʀʏ' }, type: 1 }
+            ],
+            headerType: 1
         }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
 }
