@@ -64,9 +64,6 @@ const config = {
 
 let autoReadEnabled = false;
 global.autoReadPM = false;
-// Welcome/Goodbye group settings
-const groupWelcomeSettings = new Map();
-global.welcomeSettings = groupWelcomeSettings;
 // Antidelete configuration
 const messageStore = new Map();
 const CONFIG_PATH = './antidelete.json';
@@ -785,38 +782,6 @@ async function oneViewmeg(socket, isOwner, msg, sender) {
     }
 }
 
-// Welcome/Goodbye Handler
-function setupWelcomeGoodbyeHandlers(sock) {
-    sock.ev.on('group-participants.update', async (update) => {
-        try {
-            const { id, participants, action } = update;
-            const settings = global.welcomeSettings.get(id) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
-            
-            if (action === 'add' && !settings.welcome) return;
-            if (action === 'remove' && !settings.goodbye) return;
-            
-            const groupMetadata = await sock.groupMetadata(id);
-            const groupName = groupMetadata.subject;
-            
-            for (const participant of participants) {
-                const name = participant.split('@')[0];
-                
-                if (action === 'add') {
-                    const welcomeMsg = settings.customWelcome || `🎉 *WELCOME!*\n\nHello @${name}, welcome to *${groupName}*!\n\n📌 Be respectful & enjoy!`;
-                    const message = welcomeMsg.replace(/{name}/g, name).replace(/{group}/g, groupName);
-                    await sock.sendMessage(id, { text: message, mentions: [participant] });
-                } else if (action === 'remove') {
-                    const goodbyeMsg = settings.customGoodbye || `👋 *GOODBYE!*\n\n@${name} has left the group. We wish you all the best!`;
-                    const message = goodbyeMsg.replace(/{name}/g, name).replace(/{group}/g, groupName);
-                    await sock.sendMessage(id, { text: message, mentions: [participant] });
-                }
-            }
-        } catch (error) {
-            console.error('Welcome/Goodbye error:', error);
-        }
-    });
-    console.log('👋 Welcome/Goodbye handler registered.');
-}
 function setupCommandHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
@@ -930,64 +895,6 @@ function setupCommandHandlers(socket, number) {
         }
         try {
             switch (command) {
-            
-            // Case: welcome
-case 'welcome': {
-    try {
-        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
-        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
-        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
-        const sub = (args[0] || '').toLowerCase();
-        if (sub === 'on') { settings.welcome = true; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: `👋 *ᴡᴇʟᴄᴏᴍᴇ ᴏɴ*\n\n> ${config.BOT_FOOTER}`, quoted: msg }); break; }
-        if (sub === 'off') { settings.welcome = false; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: '👋 *ᴡᴇʟᴄᴏᴍᴇ ᴏғғ*', quoted: msg }); break; }
-        await socket.sendMessage(sender, { text: `👋 *ᴡᴇʟᴄᴏᴍᴇ:* ${settings.welcome ? '✅ ᴏɴ' : '❌ ᴏғғ'}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
-    } catch (e) { console.error('Welcome error:', e); }
-    break;
-}
-
-// Case: goodbye
-case 'goodbye': {
-    try {
-        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
-        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
-        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
-        const sub = (args[0] || '').toLowerCase();
-        if (sub === 'on') { settings.goodbye = true; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: `👋 *ɢᴏᴏᴅʙʏᴇ ᴏɴ*\n\n> ${config.BOT_FOOTER}`, quoted: msg }); break; }
-        if (sub === 'off') { settings.goodbye = false; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: '👋 *ɢᴏᴏᴅʙʏᴇ ᴏғғ*', quoted: msg }); break; }
-        await socket.sendMessage(sender, { text: `👋 *ɢᴏᴏᴅʙʏᴇ:* ${settings.goodbye ? '✅ ᴏɴ' : '❌ ᴏғғ'}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
-    } catch (e) { console.error('Goodbye error:', e); }
-    break;
-}
-
-// Case: setwelcome
-case 'setwelcome': {
-    try {
-        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
-        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
-        const msg2 = args.join(' ').trim();
-        if (!msg2) { await socket.sendMessage(sender, { text: `❌ ᴜsᴀɢᴇ: \`${prefix}setwelcome ᴡᴇʟᴄᴏᴍᴇ {name}! 🎉\``, quoted: msg }); break; }
-        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
-        settings.customWelcome = msg2; settings.welcome = true;
-        global.welcomeSettings.set(from, settings);
-        await socket.sendMessage(sender, { text: `✅ *ᴄᴜsᴛᴏᴍ ᴡᴇʟᴄᴏᴍᴇ sᴇᴛ!*\n\n${msg2}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
-    } catch (e) { console.error('Setwelcome error:', e); }
-    break;
-}
-
-// Case: setgoodbye
-case 'setgoodbye': {
-    try {
-        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
-        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
-        const msg2 = args.join(' ').trim();
-        if (!msg2) { await socket.sendMessage(sender, { text: `❌ ᴜsᴀɢᴇ: \`${prefix}setgoodbye ɢᴏᴏᴅʙʏᴇ {name}! 👋\``, quoted: msg }); break; }
-        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
-        settings.customGoodbye = msg2; settings.goodbye = true;
-        global.welcomeSettings.set(from, settings);
-        await socket.sendMessage(sender, { text: `✅ *ᴄᴜsᴛᴏᴍ ɢᴏᴏᴅʙʏᴇ sᴇᴛ!*\n\n${msg2}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
-    } catch (e) { console.error('Setgoodbye error:', e); }
-    break;
-}
             case 'autoread':
 case 'autoreadpm':
 case 'readall': {
@@ -3263,6 +3170,71 @@ ${config.PREFIX}allmenu ᴛᴏ ᴠɪᴇᴡ ᴀʟʟ ᴄᴍᴅs
   }
   break;
 }
+// Case: profile / myprofile / whatsapp - View WhatsApp profile info
+case 'profile':
+case 'myprofile':
+case 'whatsapp': {
+    try {
+        const mentions = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        const target = mentions[0] || nowsender;
+        const num = target.split('@')[0];
+
+        await socket.sendMessage(sender, { react: { text: '👤', key: msg.key } });
+
+        let statusText = 'No status';
+        let ppUrl = null;
+
+        // Fetch status
+        try {
+            const status = await socket.fetchStatus(target);
+            statusText = status?.status || 'No status';
+        } catch {}
+
+        // Fetch profile picture
+        try {
+            ppUrl = await socket.profilePictureUrl(target, 'image');
+        } catch {}
+
+        const profileText =
+            `👤 *ᴡʜᴀᴛsᴀᴘᴘ ᴘʀᴏғɪʟᴇ*\n\n` +
+            `📞 *ɴᴜᴍʙᴇʀ:* +${num}\n` +
+            `💬 *sᴛᴀᴛᴜs:* ${statusText}\n` +
+            `🌐 *ᴊɪᴅ:* ${target}\n\n` +
+            `> ${config.BOT_FOOTER}`;
+
+        if (ppUrl) {
+            await socket.sendMessage(sender, {
+                image: { url: ppUrl },
+                caption: profileText,
+                buttons: [
+                    { buttonId: `${prefix}profile`, buttonText: { displayText: '👤 ᴠɪᴇᴡ ᴀɢᴀɪɴ' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        } else {
+            await socket.sendMessage(sender, {
+                text: profileText,
+                buttons: [
+                    { buttonId: `${prefix}profile`, buttonText: { displayText: '👤 ᴠɪᴇᴡ ᴀɢᴀɪɴ' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Profile] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ᴘʀᴏғɪʟᴇ ғᴇᴛᴄʜ ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
 //logo menu 
 // Case: save / nitumie / statussave - Save a WhatsApp status
 case 'save':
@@ -4084,6 +4056,88 @@ case 'npm-stats': {
     }
     break;
 }
+// Case: poll / vote - Create a WhatsApp native poll
+case 'poll':
+case 'vote': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*\n\nᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴄᴀɴ ᴏɴʟʏ ʙᴇ ᴜsᴇᴅ ɪɴ ɢʀᴏᴜᴘs.',
+                quoted: msg
+            });
+            break;
+        }
+
+        if (!isSenderGroupAdmin && !isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*\n\nᴏɴʟʏ ɢʀᴏᴜᴘ ᴀᴅᴍɪɴs ᴄᴀɴ ᴄʀᴇᴀᴛᴇ ᴘᴏʟʟs.',
+                quoted: msg
+            });
+            break;
+        }
+
+        const input = args.join(' ').trim();
+        
+        if (!input) {
+            await socket.sendMessage(sender, {
+                text: `📊 *ᴄʀᴇᴀᴛᴇ ᴘᴏʟʟ*\n\n*ᴜsᴀɢᴇ:*\n\`${prefix}poll Question | Option1 | Option2 | ...\`\n\n*ᴇxᴀᴍᴘʟᴇ:*\n\`${prefix}poll Favourite color? | Red | Blue | Green\`\n\`${prefix}poll Best food? | Pizza | Burger | Sushi | Pasta\`\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}poll Best food? | Pizza | Burger | Sushi`, buttonText: { displayText: '🍕 ғᴏᴏᴅ ᴘᴏʟʟ' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        const parts = input.split('|').map(s => s.trim()).filter(Boolean);
+        
+        if (parts.length < 3) {
+            await socket.sendMessage(sender, {
+                text: `❌ *ɪɴᴠᴀʟɪᴅ ғᴏʀᴍᴀᴛ*\n\nʏᴏᴜ ɴᴇᴇᴅ ᴀ ϙᴜᴇsᴛɪᴏɴ ᴀɴᴅ ᴀᴛ ʟᴇᴀsᴛ *2 ᴏᴘᴛɪᴏɴs*.\n\n*ᴇxᴀᴍᴘʟᴇ:*\n\`${prefix}poll Best fruit? | Apple | Mango | Banana\``,
+                quoted: msg
+            });
+            break;
+        }
+
+        const [question, ...options] = parts;
+        
+        if (options.length > 12) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴛᴏᴏ ᴍᴀɴʏ ᴏᴘᴛɪᴏɴs*\n\nᴍᴀxɪᴍᴜᴍ *12 ᴏᴘᴛɪᴏɴs* ᴀʟʟᴏᴡᴇᴅ.',
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📊', key: msg.key } });
+
+        // Send the poll
+        await socket.sendMessage(from, {
+            poll: {
+                name: question,
+                values: options,
+                selectableCount: 1
+            }
+        });
+
+        await socket.sendMessage(sender, {
+            text: `✅ *ᴘᴏʟʟ ᴄʀᴇᴀᴛᴇᴅ!*\n\n📊 *ϙᴜᴇsᴛɪᴏɴ:* ${question}\n📋 *ᴏᴘᴛɪᴏɴs:* ${options.length}\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Poll] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ᴘᴏʟʟ ᴄʀᴇᴀᴛɪᴏɴ ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
 // Case: ping
 // Case: ping - Check bot response time and uptime
 case 'ping': {
@@ -4149,6 +4203,88 @@ case 'ping': {
             headerType: 1
         }, { quoted: msg });
         
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+// Case: ascii / figlet / art / textart - Convert text to ASCII art
+case 'ascii':
+case 'figlet':
+case 'art':
+case 'textart': {
+    try {
+        const figlet = require('figlet');
+        const FONTS = ['Standard', 'Big', 'Slant', 'Banner', 'Block', 'Doom', 'Ghost', 'Poison', 'Thick'];
+
+        if (!args.length) {
+            await socket.sendMessage(sender, {
+                text: `🎨 *ᴀsᴄɪɪ ᴀʀᴛ*\n\nᴄᴏɴᴠᴇʀᴛ ᴛᴇxᴛ ᴛᴏ ᴀsᴄɪɪ ᴀʀᴛ.\n\n*ᴜsᴀɢᴇ:* \`${prefix}ascii <text>\`\n\n*ғᴏɴᴛs:* ${FONTS.map(f => f).join(', ')}\n\n*ᴡɪᴛʜ ғᴏɴᴛ:* \`${prefix}ascii Hello --font Slant\`\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}ascii Hello --font Big`, buttonText: { displayText: '🎨 ʙɪɢ ғᴏɴᴛ' }, type: 1 },
+                    { buttonId: `${prefix}ascii Hello --font Slant`, buttonText: { displayText: '🎨 sʟᴀɴᴛ' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🎨', key: msg.key } });
+
+        let font = 'Standard';
+        let text = args.join(' ');
+
+        const fontIdx = text.indexOf('--font');
+        if (fontIdx !== -1) {
+            const parts = text.slice(fontIdx + 6).trim().split(/\s+/);
+            const requestedFont = parts[0];
+            if (FONTS.map(f => f.toLowerCase()).includes(requestedFont.toLowerCase())) {
+                font = FONTS.find(f => f.toLowerCase() === requestedFont.toLowerCase());
+            }
+            text = text.slice(0, fontIdx).trim();
+        }
+
+        if (!text) {
+            await socket.sendMessage(sender, {
+                text: '❌ ᴘʀᴏᴠɪᴅᴇ ᴛᴇxᴛ ʙᴇғᴏʀᴇ ᴛʜᴇ --ғᴏɴᴛ ᴏᴘᴛɪᴏɴ.',
+                quoted: msg
+            });
+            break;
+        }
+
+        if (text.length > 30) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴛᴇxᴛ ᴛᴏᴏ ʟᴏɴɢ*\n\nᴍᴀx 30 ᴄʜᴀʀᴀᴄᴛᴇʀs ғᴏʀ ᴀsᴄɪɪ ᴀʀᴛ.',
+                quoted: msg
+            });
+            break;
+        }
+
+        figlet.text(text, { font }, async (err, result) => {
+            if (err || !result) {
+                await socket.sendMessage(sender, {
+                    text: '❌ ғᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ ᴀsᴄɪɪ ᴀʀᴛ.',
+                    quoted: msg
+                });
+                await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+                return;
+            }
+            await socket.sendMessage(sender, {
+                text: `\`\`\`\n${result}\n\`\`\`\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}ascii`, buttonText: { displayText: '🎨 ᴍᴀᴋᴇ ᴀɴᴏᴛʜᴇʀ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+        });
+
+    } catch (error) {
+        console.error('[ASCII] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ᴀsᴄɪɪ ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+            quoted: msg
+        });
         await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
@@ -4648,7 +4784,94 @@ case 'setpp': {
   }
   break;
 }
+// Case: broadcast / bc - Broadcast message to all groups (owner only)
+case 'broadcast':
+case 'bc': {
+    try {
+        if (!isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴏᴡɴᴇʀ ᴏɴʟʏ*\n\nᴏɴʟʏ ᴛʜᴇ ʙᴏᴛ ᴏᴡɴᴇʀ ᴄᴀɴ ʙʀᴏᴀᴅᴄᴀsᴛ.',
+                quoted: msg
+            });
+            break;
+        }
 
+        const text = args.join(' ').trim();
+        
+        if (!text) {
+            await socket.sendMessage(sender, {
+                text: `📢 *ʙʀᴏᴀᴅᴄᴀsᴛ*\n\nsᴇɴᴅ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ ᴀʟʟ ɢʀᴏᴜᴘs.\n\n*ᴜsᴀɢᴇ:* \`${prefix}bc ʏᴏᴜʀ ᴍᴇssᴀɢᴇ\`\n\n*ᴇxᴀᴍᴘʟᴇ:*\n\`${prefix}bc ʜᴇʟʟᴏ ᴇᴠᴇʀʏᴏɴᴇ! ɪᴍᴘᴏʀᴛᴀɴᴛ ᴀɴɴᴏᴜɴᴄᴇᴍᴇɴᴛ!\`\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📢', key: msg.key } });
+
+        // Fetch all groups
+        let groups;
+        try {
+            groups = await socket.groupFetchAllParticipating();
+        } catch (e) {
+            await socket.sendMessage(sender, {
+                text: `❌ *ғᴀɪʟᴇᴅ ᴛᴏ ғᴇᴛᴄʜ ɢʀᴏᴜᴘs*\n\n${e.message}`,
+                quoted: msg
+            });
+            break;
+        }
+
+        const groupJids = Object.keys(groups);
+        
+        if (!groupJids.length) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ɴᴏ ɢʀᴏᴜᴘs*\n\nʙᴏᴛ ɪs ɴᴏᴛ ɪɴ ᴀɴʏ ɢʀᴏᴜᴘs.',
+                quoted: msg
+            });
+            break;
+        }
+
+        // Send status message
+        await socket.sendMessage(sender, {
+            text: `📢 *ʙʀᴏᴀᴅᴄᴀsᴛɪɴɢ...*\n\nsᴇɴᴅɪɴɢ ᴛᴏ *${groupJids.length}* ɢʀᴏᴜᴘ(s)...\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+
+        // Broadcast to all groups
+        let sent = 0, failed = 0;
+        for (const g of groupJids) {
+            try {
+                await socket.sendMessage(g, {
+                    text: `📢 *ʙʀᴏᴀᴅᴄᴀsᴛ*\n\n${text}\n\n> ${config.BOT_FOOTER}`
+                });
+                sent++;
+                await new Promise(r => setTimeout(r, 800)); // Delay to avoid rate limits
+            } catch {
+                failed++;
+            }
+        }
+
+        // Send completion message
+        await socket.sendMessage(sender, {
+            text: `✅ *ʙʀᴏᴀᴅᴄᴀsᴛ ᴄᴏᴍᴘʟᴇᴛᴇ!*\n\n📤 *sᴇɴᴛ:* ${sent}\n❌ *ғᴀɪʟᴇᴅ:* ${failed}\n📊 *ᴛᴏᴛᴀʟ:* ${groupJids.length} ɢʀᴏᴜᴘs\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}bc`, buttonText: { displayText: '📢 ʙʀᴏᴀᴅᴄᴀsᴛ ᴀɢᴀɪɴ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Broadcast] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ʙʀᴏᴀᴅᴄᴀsᴛ ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
 // Case: blocklist (Blocked Users)
 case 'blocklist':
 case 'blocked': {
@@ -4702,95 +4925,61 @@ case 'blocked': {
     }
     break;
 }
-case 'lyrics': {
-    // React to the command first
-    await socket.sendMessage(sender, {
-        react: {
-            text: "🎶", // Music note emoji
-            key: msg.key
-        }
-    });
-
-    const axios = require('axios');
-    
-    // Extract query from message
-    const q = msg.message?.conversation || 
-              msg.message?.extendedTextMessage?.text || 
-              msg.message?.imageMessage?.caption || 
-              msg.message?.videoMessage?.caption || '';
-    
-    const args = q.trim().split(' ').slice(1); // Remove the command itself
-    const query = args.join(' ');
-
-    if (!query) {
-        return await socket.sendMessage(sender, {
-            text: '🎶 *Please provide a song name and artist...*\n\n' +
-                  'Example: *.lyrics not afraid Eminem*\n' +
-                  'Example: *.lyrics shape of you Ed Sheeran*',
-            buttons: [ 
-                { buttonId: '.lyrics shape of you', buttonText: { displayText: '🎵 Example 1' }, type: 1 },
-                { buttonId: '.lyrics not afraid', buttonText: { displayText: '🎵 Example 2' }, type: 1 }
-            ]
-        }, { quoted: fakevCard });
-    }
-
+// Case: lyrics / lyric - Search song lyrics
+case 'lyrics':
+case 'lyric': {
     try {
-        const apiURL = `https://api.popcat.xyz/v2/lyrics?song=${encodeURIComponent(query)}`;
-        const res = await axios.get(apiURL);
-        const data = res.data;
-
-        if (!data.success || !data.result || !data.result.lyrics) {
-            return await socket.sendMessage(sender, {
-                text: '❌ *Lyrics not found for the provided query.*\n\n' +
-                      'Please check the song name and artist spelling.',
+        if (!args.length) {
+            await socket.sendMessage(sender, {
+                text: `🎵 *sᴏɴɢ ʟʏʀɪᴄs*\n\n*ᴜsᴀɢᴇ:* \`${prefix}lyrics <artist> - <song>\`\n\n*ᴇxᴀᴍᴘʟᴇs:*\n• \`${prefix}lyrics Drake - God's Plan\`\n• \`${prefix}lyrics Ed Sheeran - Perfect\`\n• \`${prefix}lyrics Rihanna - Diamonds\`\n\n> ${config.BOT_FOOTER}`,
                 buttons: [
-                    { buttonId: '.help lyrics', buttonText: { displayText: '❓ Help' }, type: 1 },
-                    { buttonId: '.lyrics', buttonText: { displayText: '🔍 Try Again' }, type: 1 }
-                ]
-            }, { quoted: fakevCard });
+                    { buttonId: `${prefix}lyrics Drake - God's Plan`, buttonText: { displayText: '🎵 ᴅʀᴀᴋᴇ' }, type: 1 },
+                    { buttonId: `${prefix}lyrics Ed Sheeran - Perfect`, buttonText: { displayText: '🎵 ᴇᴅ sʜᴇᴇʀᴀɴ' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
         }
 
-        const { title, artist, image, link, lyrics } = data.result;
-        const shortLyrics = lyrics.length > 4096 ? lyrics.slice(0, 4093) + '...' : lyrics;
+        await socket.sendMessage(sender, { react: { text: '🎵', key: msg.key } });
 
-        const caption =
-            `🎶 *🌸 𝐂𝐀𝐒𝐄𝐘𝐑𝐇𝐎𝐃𝐄𝐒 𝐋𝐘𝐑𝐈𝐂𝐒 🌸*\n\n` +
-            `*🎵 Title:* ${title}\n` +
-            `*👤 Artist:* ${artist}\n` +
-            `*🔗 Link:* ${link}\n\n` +
-            `📜 *Lyrics:*\n\n` +
-            `${shortLyrics}\n\n` +
-            `> _Powered by CaseyRhodes Tech_ 🌟`;
+        const query = args.join(' ');
+        const sep = query.includes(' - ') ? query.split(' - ') : [null, query];
+        const artist = sep[0]?.trim() || 'unknown';
+        const title = sep[1]?.trim() || sep[0]?.trim() || query;
+
+        const res = await axios.get(
+            `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`,
+            { timeout: 12000 }
+        );
+        
+        const raw = res.data?.lyrics;
+        if (!raw) throw new Error('Not found');
+        
+        const lyrics = raw.trim().slice(0, 3500);
+        const trunc = raw.length > 3500 ? '\n\n_[...truncated]_' : '';
 
         await socket.sendMessage(sender, {
-            image: { url: image },
-            caption: caption,
+            text: `🎵 *${title}* — ${artist}\n\n${lyrics}${trunc}\n\n> ${config.BOT_FOOTER}`,
             buttons: [
-                { buttonId: `${prefix}play ${query}`,  buttonText: { displayText: '🎵 Play Song' }, type: 1 },
-                { buttonId: `${prefix}song ${query}`,  buttonText: { displayText: '📺 YouTube' }, type: 1 },
-                { buttonId: `${prefix}lyrics ${query}`, buttonText: { displayText: '🔍 New Search' }, type: 1 }
+                { buttonId: `${prefix}lyrics`, buttonText: { displayText: '🎵 sᴇᴀʀᴄʜ ᴀɢᴀɪɴ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
             ],
-            contextInfo: {
-                forwardingScore: 1,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: '120363402973786789@newsletter',
-                    newsletterName: 'CASEYRHODES-MINI🌸',
-                    serverMessageId: -1
-                }
-            }
-        }, { quoted: fakevCard });
+            headerType: 1
+        }, { quoted: msg });
 
-    } catch (err) {
-        console.error('[LYRICS ERROR]', err);
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch {
         await socket.sendMessage(sender, {
-            text: '❌ *An error occurred while fetching lyrics!*\n\n' +
-                  'Please try again later or check your internet connection.',
+            text: `❌ *ʟʏʀɪᴄs ɴᴏᴛ ғᴏᴜɴᴅ*\n\nᴛʀʏ: \`${prefix}lyrics Artist - Song Title\`\n\n*ᴇxᴀᴍᴘʟᴇ:* \`${prefix}lyrics Drake - God's Plan\``,
             buttons: [
-                { buttonId: '.lyrics', buttonText: { displayText: '🔄 Retry' }, type: 1 },
-                { buttonId: '.help', buttonText: { displayText: '❓ Help' }, type: 1 }
-            ]
-        }, { quoted: fakevCard });
+                { buttonId: `${prefix}lyrics`, buttonText: { displayText: '🎵 ᴛʀʏ ᴀɢᴀɪɴ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
 }
