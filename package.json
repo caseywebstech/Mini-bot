@@ -16,6 +16,7 @@
     "jimp": "^0.16.1",
     "gifted-btns": "*",
     "mumaker": "^2.0.0",
+     "figlet": "^1.11.0",
     "form-data":"latest",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "ffmpeg": "^0.0.4",
