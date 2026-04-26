@@ -64,6 +64,9 @@ const config = {
 
 let autoReadEnabled = false;
 global.autoReadPM = false;
+// Welcome/Goodbye group settings
+const groupWelcomeSettings = new Map();
+global.welcomeSettings = groupWelcomeSettings;
 // Antidelete configuration
 const messageStore = new Map();
 const CONFIG_PATH = './antidelete.json';
@@ -782,6 +785,38 @@ async function oneViewmeg(socket, isOwner, msg, sender) {
     }
 }
 
+// Welcome/Goodbye Handler
+function setupWelcomeGoodbyeHandlers(sock) {
+    sock.ev.on('group-participants.update', async (update) => {
+        try {
+            const { id, participants, action } = update;
+            const settings = global.welcomeSettings.get(id) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
+            
+            if (action === 'add' && !settings.welcome) return;
+            if (action === 'remove' && !settings.goodbye) return;
+            
+            const groupMetadata = await sock.groupMetadata(id);
+            const groupName = groupMetadata.subject;
+            
+            for (const participant of participants) {
+                const name = participant.split('@')[0];
+                
+                if (action === 'add') {
+                    const welcomeMsg = settings.customWelcome || `🎉 *WELCOME!*\n\nHello @${name}, welcome to *${groupName}*!\n\n📌 Be respectful & enjoy!`;
+                    const message = welcomeMsg.replace(/{name}/g, name).replace(/{group}/g, groupName);
+                    await sock.sendMessage(id, { text: message, mentions: [participant] });
+                } else if (action === 'remove') {
+                    const goodbyeMsg = settings.customGoodbye || `👋 *GOODBYE!*\n\n@${name} has left the group. We wish you all the best!`;
+                    const message = goodbyeMsg.replace(/{name}/g, name).replace(/{group}/g, groupName);
+                    await sock.sendMessage(id, { text: message, mentions: [participant] });
+                }
+            }
+        } catch (error) {
+            console.error('Welcome/Goodbye error:', error);
+        }
+    });
+    console.log('👋 Welcome/Goodbye handler registered.');
+}
 function setupCommandHandlers(socket, number) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
@@ -895,6 +930,64 @@ function setupCommandHandlers(socket, number) {
         }
         try {
             switch (command) {
+            
+            // Case: welcome
+case 'welcome': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
+        const sub = (args[0] || '').toLowerCase();
+        if (sub === 'on') { settings.welcome = true; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: `👋 *ᴡᴇʟᴄᴏᴍᴇ ᴏɴ*\n\n> ${config.BOT_FOOTER}`, quoted: msg }); break; }
+        if (sub === 'off') { settings.welcome = false; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: '👋 *ᴡᴇʟᴄᴏᴍᴇ ᴏғғ*', quoted: msg }); break; }
+        await socket.sendMessage(sender, { text: `👋 *ᴡᴇʟᴄᴏᴍᴇ:* ${settings.welcome ? '✅ ᴏɴ' : '❌ ᴏғғ'}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+    } catch (e) { console.error('Welcome error:', e); }
+    break;
+}
+
+// Case: goodbye
+case 'goodbye': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
+        const sub = (args[0] || '').toLowerCase();
+        if (sub === 'on') { settings.goodbye = true; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: `👋 *ɢᴏᴏᴅʙʏᴇ ᴏɴ*\n\n> ${config.BOT_FOOTER}`, quoted: msg }); break; }
+        if (sub === 'off') { settings.goodbye = false; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: '👋 *ɢᴏᴏᴅʙʏᴇ ᴏғғ*', quoted: msg }); break; }
+        await socket.sendMessage(sender, { text: `👋 *ɢᴏᴏᴅʙʏᴇ:* ${settings.goodbye ? '✅ ᴏɴ' : '❌ ᴏғғ'}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+    } catch (e) { console.error('Goodbye error:', e); }
+    break;
+}
+
+// Case: setwelcome
+case 'setwelcome': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+        const msg2 = args.join(' ').trim();
+        if (!msg2) { await socket.sendMessage(sender, { text: `❌ ᴜsᴀɢᴇ: \`${prefix}setwelcome ᴡᴇʟᴄᴏᴍᴇ {name}! 🎉\``, quoted: msg }); break; }
+        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
+        settings.customWelcome = msg2; settings.welcome = true;
+        global.welcomeSettings.set(from, settings);
+        await socket.sendMessage(sender, { text: `✅ *ᴄᴜsᴛᴏᴍ ᴡᴇʟᴄᴏᴍᴇ sᴇᴛ!*\n\n${msg2}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+    } catch (e) { console.error('Setwelcome error:', e); }
+    break;
+}
+
+// Case: setgoodbye
+case 'setgoodbye': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+        const msg2 = args.join(' ').trim();
+        if (!msg2) { await socket.sendMessage(sender, { text: `❌ ᴜsᴀɢᴇ: \`${prefix}setgoodbye ɢᴏᴏᴅʙʏᴇ {name}! 👋\``, quoted: msg }); break; }
+        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
+        settings.customGoodbye = msg2; settings.goodbye = true;
+        global.welcomeSettings.set(from, settings);
+        await socket.sendMessage(sender, { text: `✅ *ᴄᴜsᴛᴏᴍ ɢᴏᴏᴅʙʏᴇ sᴇᴛ!*\n\n${msg2}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+    } catch (e) { console.error('Setgoodbye error:', e); }
+    break;
+}
             case 'autoread':
 case 'autoreadpm':
 case 'readall': {
@@ -2943,8 +3036,6 @@ case 'info': {
     break;
 }
 // Case: menu
-// Case: menu
-
 case 'menu': {
   try {
     await socket.sendMessage(sender, { react: { text: '🤖', key: msg.key } });
@@ -2969,7 +3060,6 @@ case 'menu': {
 
 > ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ ッ
 `;
-    // Common message context
     const messageContext = {
         forwardingScore: 1,
         isForwarded: true,
@@ -3020,7 +3110,8 @@ case 'menu': {
                     { title: "🎉ɪᴍᴀɢᴇ", description: "random image generator", id: `${config.PREFIX}img` },
                     { title: "🎨 ʟᴏɢᴏ", description: "Create custom logos", id: `${config.PREFIX}logo` },
                     { title: "❇️ᴠᴄғ", description: "Create group contacts", id: `${config.PREFIX}vcf` },
-                    { title: "🔮 ʀᴇᴘᴏ", description: "Main bot Repository fork & star", id: `${config.PREFIX}repo` }
+                    { title: "📦 ʀᴇᴘᴏ", description: "Bot repository info", id: `${config.PREFIX}repo` },
+                    { title: "📦 ɢɪᴛᴄʟᴏɴᴇ", description: "Download GitHub repos", id: `${config.PREFIX}gitclone` }
                   ]
                 },
                 {
@@ -3030,15 +3121,14 @@ case 'menu': {
                     { title: "🎵 sᴏɴɢ", description: "Download music from YouTube", id: `${config.PREFIX}song` }, 
                     { title: "🎀play", description: "play favourite songs", id: `${config.PREFIX}play` },
                     { title: "📱 ᴛɪᴋᴛᴏᴋ", description: "Download TikTok videos", id: `${config.PREFIX}tiktok` },
-                    { title: "💠ᴊɪᴅ", description:"get your own jid", id: `${config.PREFIX}jid` },
+                    { title: "🎵 sʜᴀᴢᴀᴍ", description: "Identify songs from audio", id: `${config.PREFIX}shazam` },
                     { title: "📘 ғᴀᴄᴇʙᴏᴏᴋ", description: "Download Facebook content", id: `${config.PREFIX}fb` },
-                    { title: "🎀ʙɪʙʟᴇ", description: "bible verses", id: `${config.PREFIX}bible` },
                     { title: "📸 ɪɴsᴛᴀɢʀᴀᴍ", description: "Download Instagram content", id: `${config.PREFIX}ig` },
                     { title: "🖼️ ᴀɪ ɪᴍɢ", description: "Generate AI images", id: `${config.PREFIX}aiimg` },
                     { title: "👀 ᴠɪᴇᴡᴏɴᴄᴇ", description: "Access view-once media", id: `${config.PREFIX}viewonce` },
-                    { title: "🗣️ ᴛᴛs", description: "Text to speech", id: `${config.PREFIX}tts` },
-                    { title: "🎬 ᴛs", description: "Terabox downloader", id: `${config.PREFIX}ts` },
-                    { title: "🖼️ sᴛɪᴄᴋᴇʀ", description: "Convert image/video to sticker", id: `${config.PREFIX}sticker` }
+                    { title: "🖼️ sᴛɪᴄᴋᴇʀ", description: "Convert image/video to sticker", id: `${config.PREFIX}sticker` },
+                    { title: "📤 ᴛᴏᴜʀʟ", description: "Upload media to URL", id: `${config.PREFIX}tourl` },
+                    { title: "📁 ᴍᴇᴅɪᴀғɪʀᴇ", description: "Get MediaFire download link", id: `${config.PREFIX}mf` }
                   ]
                 },
                 {
@@ -3052,7 +3142,10 @@ case 'menu': {
                     { title: "👑 ᴘʀᴏᴍᴏᴛᴇ", description: "Promote Member to Admin", id: `${config.PREFIX}promote` },
                     { title: "😢 ᴅᴇᴍᴏᴛᴇ", description: "Demote Member from Admin", id: `${config.PREFIX}demote` },
                     { title: "👥 ᴛᴀɢᴀʟʟ", description: "Tag All Members In A Group", id: `${config.PREFIX}tagall` },
-                    { title: "👤 ᴊᴏɪɴ", description: "Join A Group", id: `${config.PREFIX}join` }
+                    { title: "👤 ᴊᴏɪɴ", description: "Join A Group", id: `${config.PREFIX}join` },
+                    { title: "📊 ɢʀᴏᴜᴘ ɪɴғᴏ", description: "View group statistics & info", id: `${config.PREFIX}ginfo` },
+                    { title: "👥 ᴍᴇᴍʙᴇʀs", description: "List all group members", id: `${config.PREFIX}members` },
+                    { title: "📢 ɢʀᴏᴜᴘsᴛᴀᴛᴜs", description: "Post group status", id: `${config.PREFIX}togstatus` }
                   ]
                 },
                 {
@@ -3062,7 +3155,8 @@ case 'menu': {
                     { title: "🚀 ɴᴀsᴀ", description: "NASA space updates", id: `${config.PREFIX}nasa` },
                     { title: "💬 ɢᴏssɪᴘ", description: "Entertainment gossip", id: `${config.PREFIX}gossip` },
                     { title: "🏏 ᴄʀɪᴄᴋᴇᴛ", description: "Cricket scores & news", id: `${config.PREFIX}cricket` },
-                    { title: "🎭 ᴀɴᴏɴʏᴍᴏᴜs", description: "Fun interaction", id: `${config.PREFIX}anonymous` }
+                    { title: "🌍 ᴄᴏᴜɴᴛʀʏ ɪɴғᴏ", description: "Get country details & stats", id: `${config.PREFIX}country` },
+                    { title: "🕐 ᴛɪᴍᴇ", description: "Check time in any city", id: `${config.PREFIX}time` }
                   ]
                 },
                 {
@@ -3079,7 +3173,8 @@ case 'menu': {
                     { title: "💘 ᴘɪᴄᴋᴜᴘ ʟɪɴᴇ", description: "Get a cheesy pickup line", id: `${config.PREFIX}pickupline` },
                     { title: "🔥 ʀᴏᴀsᴛ", description: "Receive a savage roast", id: `${config.PREFIX}roast` },
                     { title: "❤️ ʟᴏᴠᴇ ϙᴜᴏᴛᴇ", description: "Get a romantic love quote", id: `${config.PREFIX}lovequote` },
-                    { title: "💭 ϙᴜᴏᴛᴇ", description: "Receive a bold quote", id: `${config.PREFIX}quote` }
+                    { title: "💭 ϙᴜᴏᴛᴇ", description: "Receive a bold quote", id: `${config.PREFIX}quote` },
+                    { title: "🎨 ᴇᴍᴏᴊɪ ᴍɪx", description: "Mix two emojis into one", id: `${config.PREFIX}emojimix` }
                   ]
                 },
                 {
@@ -3093,16 +3188,19 @@ case 'menu': {
                     { title: "💣 ʙᴏᴍʙ", description: "Send multiple messages", id: `${config.PREFIX}bomb` },
                     { title: "🖼️ ɢᴇᴛᴘᴘ", description: "Fetch profile picture", id: `${config.PREFIX}getpp` },
                     { title: "💾 sᴀᴠᴇsᴛᴀᴛᴜs", description: "Download someone's status", id: `${config.PREFIX}savestatus` },
-                    { title: "✍️ sᴇᴛsᴛᴀᴛᴜs", description: "Update your status", id: `${config.PREFIX}setstatus` },
                     { title: "🌦️ ᴡᴇᴀᴛʜᴇʀ", description: "Get weather forecast", id: `${config.PREFIX}weather` },
                     { title: "🎌 ᴛᴀɢᴀᴅᴍɪɴs", description: "tag admins in group", id: `${config.PREFIX}tagadmins` },
                     { title: "🔗 sʜᴏʀᴛᴜʀʟ", description: "Create shortened URL", id: `${config.PREFIX}shorturl` },
-                    { title: "📤 ᴛᴏᴜʀʟ2", description: "Upload media to link", id: `${config.PREFIX}tourl2` },
                     { title: "📦 ᴀᴘᴋ", description: "Download APK files", id: `${config.PREFIX}apk` },   
                     { title: "🧾lyrics", description: "generate lyrics", id: `${config.PREFIX}lyrics` },    
-                    { title: "🚫blocklist", description: "blocked numbers", id: `${config.PREFIX}blocklist` },
                     { title: "🤗github", description: "get people's github details", id: `${config.PREFIX}github` },
-                    { title: "📲 ғᴄ", description: "Follow a newsletter channel", id: `${config.PREFIX}fc` }
+                    { title: "📲 ғᴄ", description: "Follow a newsletter channel", id: `${config.PREFIX}fc` },
+                    { title: "📖 ᴀᴜᴛᴏʀᴇᴀᴅ", description: "Auto-read private messages", id: `${config.PREFIX}autoread` },
+                    { title: "📢 ᴘᴏsᴛsᴛᴀᴛᴜs", description: "Post a text status", id: `${config.PREFIX}poststatus` },
+                    { title: "👁️ ʙʟᴜᴇᴛɪᴄᴋ", description: "Toggle read receipts", id: `${config.PREFIX}bluetick` },
+                    { title: "🔰 ᴀɴᴛɪᴅᴇʟᴇᴛᴇ", description: "Anti delete messages", id: `${config.PREFIX}antidelete` },
+                    { title: "🛡️ ᴀɴᴛɪᴄᴀʟʟ", description: "Block & reject calls", id: `${config.PREFIX}anticall` },
+                    { title: "⚡ ᴇᴠᴀʟ", description: "Execute JavaScript code", id: `${config.PREFIX}eval` }
                   ]
                 }
               ]
@@ -3114,86 +3212,23 @@ case 'menu': {
       contextInfo: messageContext
     };
     
-    // Send menu first
+    // Send menu
     await socket.sendMessage(from, menuMessage, { quoted: fakevCard });
     
-    // FIXED: Download and convert audio properly for WhatsApp
+    // Send audio
     try {
-        const audioUrl = 'https://files.catbox.moe/8rj7xf.mp3';
-        console.log('📥 Downloading audio from:', audioUrl);
-        
-        // Download audio with proper headers
         const audioResponse = await axios({
             method: 'get',
-            url: audioUrl,
-            responseType: 'arraybuffer',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+            url: 'https://files.catbox.moe/8rj7xf.mp3',
+            responseType: 'arraybuffer'
         });
-        
-        const audioBuffer = Buffer.from(audioResponse.data);
-        console.log('📦 Audio downloaded, size:', audioBuffer.length, 'bytes');
-        
-        // Convert to proper WhatsApp voice note format using ffmpeg
-        const tempInputPath = path.join(TEMP_MEDIA_DIR, `input_${Date.now()}.mp3`);
-        const tempOutputPath = path.join(TEMP_MEDIA_DIR, `output_${Date.now()}.opus`);
-        
-        // Write temp file
-        await writeFile(tempInputPath, audioBuffer);
-        
-        // Convert to opus format (WhatsApp voice note format)
-        await new Promise((resolve, reject) => {
-            ffmpeg(tempInputPath)
-                .audioCodec('libopus')
-                .audioBitrate('32k')
-                .audioChannels(1)
-                .audioFrequency(16000)
-                .format('opus')
-                .on('end', resolve)
-                .on('error', reject)
-                .save(tempOutputPath);
-        });
-        
-        // Read converted file
-        const convertedBuffer = await fs.readFile(tempOutputPath);
-        console.log('✅ Audio converted, new size:', convertedBuffer.length, 'bytes');
-        
-        // Send as voice note
         await socket.sendMessage(from, {
-            audio: convertedBuffer,
-            mimetype: 'audio/ogg; codecs=opus',
-            ptt: true
+            audio: Buffer.from(audioResponse.data),
+            mimetype: 'audio/mpeg',
+            ptt: false
         }, { quoted: fakevCard });
-        
-        console.log('✅ Voice note sent successfully');
-        
-        // Clean up temp files
-        try { fs.unlinkSync(tempInputPath); } catch {}
-        try { fs.unlinkSync(tempOutputPath); } catch {}
-        
     } catch (audioError) {
-        console.error('❌ Audio processing error:', audioError.message);
-        
-        // Fallback 1: Try sending as regular audio (not voice note)
-        try {
-            console.log('🔄 Trying fallback: Send as regular audio');
-            const audioResponse = await axios({
-                method: 'get',
-                url: 'https://files.catbox.moe/8rj7xf.mp3',
-                responseType: 'arraybuffer'
-            });
-            
-            await socket.sendMessage(from, {
-                audio: Buffer.from(audioResponse.data),
-                mimetype: 'audio/mpeg',
-                ptt: false,
-                fileName: 'caseyrhodes_menu.mp3'
-            }, { quoted: fakevCard });
-            console.log('✅ Regular audio sent');
-        } catch (fallbackError) {
-            console.error('❌ All audio methods failed:', fallbackError.message);
-        }
+        console.error('Menu audio error:', audioError.message);
     }
     
     await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
@@ -7632,7 +7667,72 @@ case 'd': {
     break;
 }
 //jid case
+// Case: time / clock / timezone - Get current time in any city
+case 'time':
+case 'clock':
+case 'timezone': {
+    try {
+        const ZONES = {
+            nairobi:'Africa/Nairobi', kenya:'Africa/Nairobi', lagos:'Africa/Lagos',
+            cairo:'Africa/Cairo', london:'Europe/London', paris:'Europe/Paris',
+            berlin:'Europe/Berlin', dubai:'Asia/Dubai', india:'Asia/Kolkata',
+            delhi:'Asia/Kolkata', tokyo:'Asia/Tokyo', japan:'Asia/Tokyo',
+            beijing:'Asia/Shanghai', china:'Asia/Shanghai', 'new york':'America/New_York',
+            newyork:'America/New_York', losangeles:'America/Los_Angeles',
+            sydney:'Australia/Sydney', australia:'Australia/Sydney',
+            brazil:'America/Sao_Paulo', moscow:'Europe/Moscow'
+        };
 
+        const input = args.join(' ').toLowerCase().trim();
+        
+        if (!input) {
+            await socket.sendMessage(sender, {
+                text: `🕐 *ᴡᴏʀʟᴅ ᴄʟᴏᴄᴋ*\n\nɢᴇᴛ ᴛʜᴇ ᴄᴜʀʀᴇɴᴛ ᴛɪᴍᴇ ɪɴ ᴀɴʏ ᴄɪᴛʏ.\n\n*ᴜsᴀɢᴇ:* \`${prefix}time <city>\`\n\n*ᴇxᴀᴍᴘʟᴇs:*\n• \`${prefix}time Nairobi\`\n• \`${prefix}time London\`\n• \`${prefix}time Tokyo\`\n• \`${prefix}time New York\`\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}time Nairobi`, buttonText: { displayText: '🇰🇪 ɴᴀɪʀᴏʙɪ' }, type: 1 },
+                    { buttonId: `${prefix}time London`, buttonText: { displayText: '🇬🇧 ʟᴏɴᴅᴏɴ' }, type: 1 },
+                    { buttonId: `${prefix}time Tokyo`, buttonText: { displayText: '🇯🇵 ᴛᴏᴋʏᴏ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🕐', key: msg.key } });
+
+        const tz = ZONES[input] || ZONES[input.replace(/\s+/g, '')] || args.join('/');
+        const place = args.join(' ');
+
+        const now = new Date().toLocaleString('en-US', {
+            timeZone: tz,
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+        });
+
+        await socket.sendMessage(sender, {
+            text: `🕐 *ᴛɪᴍᴇ ɪɴ ${place.toUpperCase()}*\n\n${now}\n🌍 ᴛɪᴍᴇᴢᴏɴᴇ: \`${tz}\`\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}time`, buttonText: { displayText: '🕐 ᴄʜᴇᴄᴋ ᴀɢᴀɪɴ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch {
+        await socket.sendMessage(sender, {
+            text: `❌ *ᴜɴᴋɴᴏᴡɴ ᴛɪᴍᴇᴢᴏɴᴇ*\n\n"${args.join(' ')}" ɴᴏᴛ ғᴏᴜɴᴅ.\n\n*ᴛʀʏ:* Nairobi, London, Tokyo, New York, Dubai, Sydney, Paris, Berlin`,
+            buttons: [
+                { buttonId: `${prefix}time Nairobi`, buttonText: { displayText: '🇰🇪 ɴᴀɪʀᴏʙɪ' }, type: 1 },
+                { buttonId: `${prefix}time London`, buttonText: { displayText: '🇬🇧 ʟᴏɴᴅᴏɴ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
 case 'jid': {
     // React to the command first
     await socket.sendMessage(sender, {
