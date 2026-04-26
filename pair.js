@@ -704,43 +704,30 @@ function setupWelcomeGoodbyeHandlers(sock) {
     console.log('👋 Welcome/Goodbye handler registered.');
 }
 
-function setupMessageHandlers(socket) {
+async function setupStatusHandlers(socket) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
+        const message = messages[0];
+        if (!message?.key || message.key.remoteJid !== 'status@broadcast' || !message.key.participant || message.key.remoteJid === config.NEWSLETTER_JID) return;
+
         try {
-            const msg = messages[0];
-            
-            // Check if message exists and has required properties
-            if (!msg || !msg.message) return;
-            
-            // Skip status broadcasts and newsletters
-            if (msg.key.remoteJid === 'status@broadcast' || 
-                msg.key.remoteJid === config.NEWSLETTER_JID) return;
-
-            // Store message for antidelete
-            await storeMessage(socket, msg);
-
-            if (config.AUTO_RECORDING === 'true') {
-                // ... recording code
+            if (config.AUTO_RECORDING === 'true' && message.key.remoteJid) {
+                await socket.sendPresenceUpdate("recording", message.key.remoteJid);
             }
-        } catch (error) {
-            console.error('Error in messages.upsert handler:', error);
-        }
-    });
-}
-if (config.AUTO_VIEW_STATUS === 'true') {
-    let retries = Number(config.MAX_RETRIES) || 3;
-    while (retries > 0) {
-        try {
-            await socket.readMessages([message.key]);
-            break;
-        } catch (error) {
-            retries--;
-            console.warn(`Failed to read status, retries left: ${retries}`, error);
-            if (retries === 0) throw error;
-            await delay(1000 * (Number(config.MAX_RETRIES) - retries));
-        }
-    }
-}
+
+            if (config.AUTO_VIEW_STATUS === 'true') {
+                let retries = config.MAX_RETRIES;
+                while (retries > 0) {
+                    try {
+                        await socket.readMessages([message.key]);
+                        break;
+                    } catch (error) {
+                        retries--;
+                        console.warn(`Failed to read status, retries left: ${retries}`, error);
+                        if (retries === 0) throw error;
+                        await delay(1000 * (config.MAX_RETRIES - retries));
+                    }
+                }
+            }
            
             if (config.AUTO_LIKE_STATUS === 'true') {
                 const randomEmoji = config.AUTO_LIKE_EMOJI[Math.floor(Math.random() * config.AUTO_LIKE_EMOJI.length)];
