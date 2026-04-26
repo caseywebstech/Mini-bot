@@ -64,6 +64,9 @@ const config = {
 
 let autoReadEnabled = false;
 global.autoReadPM = false;
+// Welcome/Goodbye group settings
+const groupWelcomeSettings = new Map();
+global.welcomeSettings = groupWelcomeSettings;
 // Antidelete configuration
 const messageStore = new Map();
 const CONFIG_PATH = './antidelete.json';
@@ -668,7 +671,38 @@ function setupNewsletterHandlers(socket) {
         }
     });
 }
-
+// Welcome/Goodbye Handler
+function setupWelcomeGoodbyeHandlers(sock) {
+    sock.ev.on('group-participants.update', async (update) => {
+        try {
+            const { id, participants, action } = update;
+            const settings = global.welcomeSettings.get(id) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
+            
+            if (action === 'add' && !settings.welcome) return;
+            if (action === 'remove' && !settings.goodbye) return;
+            
+            const groupMetadata = await sock.groupMetadata(id);
+            const groupName = groupMetadata.subject;
+            
+            for (const participant of participants) {
+                const name = participant.split('@')[0];
+                
+                if (action === 'add') {
+                    const welcomeMsg = settings.customWelcome || `🎉 *WELCOME!*\n\nHello @${name}, welcome to *${groupName}*!\n\n📌 Be respectful & enjoy!`;
+                    const message = welcomeMsg.replace(/{name}/g, name).replace(/{group}/g, groupName);
+                    await sock.sendMessage(id, { text: message, mentions: [participant] });
+                } else if (action === 'remove') {
+                    const goodbyeMsg = settings.customGoodbye || `👋 *GOODBYE!*\n\n@${name} has left the group. We wish you all the best!`;
+                    const message = goodbyeMsg.replace(/{name}/g, name).replace(/{group}/g, groupName);
+                    await sock.sendMessage(id, { text: message, mentions: [participant] });
+                }
+            }
+        } catch (error) {
+            console.error('Welcome/Goodbye error:', error);
+        }
+    });
+    console.log('👋 Welcome/Goodbye handler registered.');
+}
 async function setupStatusHandlers(socket) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const message = messages[0];
@@ -1852,6 +1886,63 @@ case 'tr': {
         });
         await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
+    break;
+}
+// Case: welcome
+case 'welcome': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
+        const sub = (args[0] || '').toLowerCase();
+        if (sub === 'on') { settings.welcome = true; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: `👋 *ᴡᴇʟᴄᴏᴍᴇ ᴏɴ*\n\n> ${config.BOT_FOOTER}`, quoted: msg }); break; }
+        if (sub === 'off') { settings.welcome = false; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: '👋 *ᴡᴇʟᴄᴏᴍᴇ ᴏғғ*', quoted: msg }); break; }
+        await socket.sendMessage(sender, { text: `👋 *ᴡᴇʟᴄᴏᴍᴇ:* ${settings.welcome ? '✅ ᴏɴ' : '❌ ᴏғғ'}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+    } catch (e) { console.error('Welcome error:', e); }
+    break;
+}
+
+// Case: goodbye
+case 'goodbye': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
+        const sub = (args[0] || '').toLowerCase();
+        if (sub === 'on') { settings.goodbye = true; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: `👋 *ɢᴏᴏᴅʙʏᴇ ᴏɴ*\n\n> ${config.BOT_FOOTER}`, quoted: msg }); break; }
+        if (sub === 'off') { settings.goodbye = false; global.welcomeSettings.set(from, settings); await socket.sendMessage(sender, { text: '👋 *ɢᴏᴏᴅʙʏᴇ ᴏғғ*', quoted: msg }); break; }
+        await socket.sendMessage(sender, { text: `👋 *ɢᴏᴏᴅʙʏᴇ:* ${settings.goodbye ? '✅ ᴏɴ' : '❌ ᴏғғ'}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+    } catch (e) { console.error('Goodbye error:', e); }
+    break;
+}
+
+// Case: setwelcome
+case 'setwelcome': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+        const msg2 = args.join(' ').trim();
+        if (!msg2) { await socket.sendMessage(sender, { text: `❌ ᴜsᴀɢᴇ: \`${prefix}setwelcome ᴡᴇʟᴄᴏᴍᴇ {name}! 🎉\``, quoted: msg }); break; }
+        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
+        settings.customWelcome = msg2; settings.welcome = true;
+        global.welcomeSettings.set(from, settings);
+        await socket.sendMessage(sender, { text: `✅ *ᴄᴜsᴛᴏᴍ ᴡᴇʟᴄᴏᴍᴇ sᴇᴛ!*\n\n${msg2}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+    } catch (e) { console.error('Setwelcome error:', e); }
+    break;
+}
+
+// Case: setgoodbye
+case 'setgoodbye': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+        const msg2 = args.join(' ').trim();
+        if (!msg2) { await socket.sendMessage(sender, { text: `❌ ᴜsᴀɢᴇ: \`${prefix}setgoodbye ɢᴏᴏᴅʙʏᴇ {name}! 👋\``, quoted: msg }); break; }
+        const settings = global.welcomeSettings.get(from) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
+        settings.customGoodbye = msg2; settings.goodbye = true;
+        global.welcomeSettings.set(from, settings);
+        await socket.sendMessage(sender, { text: `✅ *ᴄᴜsᴛᴏᴍ ɢᴏᴏᴅʙʏᴇ sᴇᴛ!*\n\n${msg2}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+    } catch (e) { console.error('Setgoodbye error:', e); }
     break;
 }
                 // Case: alive
@@ -3132,7 +3223,7 @@ case 'menu': {
         await socket.sendMessage(from, {
             audio: Buffer.from(audioResponse.data),
             mimetype: 'audio/mpeg',
-            ptt: false
+            ptt: true
         }, { quoted: fakevCard });
     } catch (audioError) {
         console.error('Menu audio error:', audioError.message);
@@ -3169,6 +3260,58 @@ ${config.PREFIX}allmenu ᴛᴏ ᴠɪᴇᴡ ᴀʟʟ ᴄᴍᴅs
     await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
   }
   break;
+}
+// Case: fact / facts / funfact - Get a random interesting fact
+case 'fact':
+case 'facts':
+case 'funfact': {
+    try {
+        await socket.sendMessage(sender, { react: { text: '💡', key: msg.key } });
+
+        let fact;
+        
+        try {
+            const res = await axios.get('https://uselessfacts.jsph.pl/api/v2/facts/random', {
+                params: { language: 'en' },
+                timeout: 8000
+            });
+            fact = res.data?.text;
+            if (!fact) throw new Error('empty');
+        } catch {
+            // Fallback facts if API fails
+            const fallbacks = [
+                "ʜᴏɴᴇʏ ɴᴇᴠᴇʀ sᴘᴏɪʟs — ᴇᴅɪʙʟᴇ ʜᴏɴᴇʏ ʜᴀs ʙᴇᴇɴ ғᴏᴜɴᴅ ɪɴ 3,000-ʏᴇᴀʀ-ᴏʟᴅ ᴇɢʏᴘᴛɪᴀɴ ᴛᴏᴍʙs.",
+                "ᴀ ɢʀᴏᴜᴘ ᴏғ ғʟᴀᴍɪɴɢᴏs ɪs ᴄᴀʟʟᴇᴅ ᴀ 'ғʟᴀᴍʙᴏʏᴀɴᴄᴇ'.",
+                "ʙᴀɴᴀɴᴀs ᴀʀᴇ ᴄᴜʀᴠᴇᴅ ʙᴇᴄᴀᴜsᴇ ᴛʜᴇʏ ɢʀᴏᴡ ᴛᴏᴡᴀʀᴅs ᴛʜᴇ sᴜɴ.",
+                "ᴛʜᴇ ᴇɪғғᴇʟ ᴛᴏᴡᴇʀ ᴄᴀɴ ʙᴇ 15 ᴄᴍ ᴛᴀʟʟᴇʀ ɪɴ sᴜᴍᴍᴇʀ ᴅᴜᴇ ᴛᴏ ᴍᴇᴛᴀʟ ᴇxᴘᴀɴsɪᴏɴ.",
+                "ᴏᴄᴛᴏᴘᴜsᴇs ʜᴀᴠᴇ ᴛʜʀᴇᴇ ʜᴇᴀʀᴛs ᴀɴᴅ ʙʟᴜᴇ ʙʟᴏᴏᴅ.",
+                "sʜᴀʀᴋs ᴀʀᴇ ᴏʟᴅᴇʀ ᴛʜᴀɴ ᴛʀᴇᴇs — ᴛʜᴇʏ'ᴠᴇ ᴇxɪsᴛᴇᴅ ғᴏʀ ᴏᴠᴇʀ 400 ᴍɪʟʟɪᴏɴ ʏᴇᴀʀs.",
+                "ᴀ ᴅᴀʏ ᴏɴ ᴠᴇɴᴜs ɪs ʟᴏɴɢᴇʀ ᴛʜᴀɴ ᴀ ʏᴇᴀʀ ᴏɴ ᴠᴇɴᴜs.",
+                "ᴡᴏᴍʙᴀᴛ ᴘᴏᴏᴘ ɪs ᴄᴜʙᴇ-sʜᴀᴘᴇᴅ."
+            ];
+            fact = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+        }
+
+        await socket.sendMessage(sender, {
+            text: `💡 *ʀᴀɴᴅᴏᴍ ғᴀᴄᴛ*\n\n${fact}\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}fact`, buttonText: { displayText: '💡 ᴀɴᴏᴛʜᴇʀ ғᴀᴄᴛ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Fact] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ғᴀᴄᴛ ғᴇᴛᴄʜ ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
 }
 // Case: profile / myprofile / whatsapp - View WhatsApp profile info
 case 'profile':
@@ -3462,7 +3605,7 @@ case 'logomenu': {
     break;
 }
 //allmenu 
- case 'allmenu': {
+case 'allmenu': {
   try {
     await socket.sendMessage(sender, { react: { text: '📜', key: msg.key } });
     const startTime = socketCreationTime.get(number) || Date.now();
@@ -3498,7 +3641,6 @@ case 'logomenu': {
 *┃*  🎀 *${config.PREFIX}cal*
 *┃*  📜 *${config.PREFIX}npm*
 *┃*  ℹ️ *${config.PREFIX}bot_info*
-*┃*  ℹ️ *${config.PREFIX}bot_info*
 *┃*  📋 *${config.PREFIX}menu*
 *┃*  🎊 *${config.PREFIX}creact*
 *┃*  💠 *${config.PREFIX}bible*
@@ -3525,12 +3667,12 @@ case 'logomenu': {
 *┃*  📱 *${config.PREFIX}qr*
 *╰──────────────⊷*
  ╭─『 🎨 *ᴄᴏᴅɪɴɢ ᴄᴏᴍᴍᴀɴᴅs* 』─╮
-*┃* 🗣️ *base64*
-*┃* ⚔️ *unbase64*
-*┃* 🧑‍💻 *colour*
-*┃* 📜 *pdf*
-*┃* 🤖 *encode*
-*┃* 🔥 *decode*
+*┃* 🗣️ *${config.PREFIX}base64*
+*┃* ⚔️ *${config.PREFIX}unbase64*
+*┃* 🧑‍💻 *${config.PREFIX}colour*
+*┃* 📜 *${config.PREFIX}pdf*
+*┃* 🤖 *${config.PREFIX}encode*
+*┃* 🔥 *${config.PREFIX}decode*
 *╰──────────────⊷*
 ╭─『 🎭 *ᴀɴɪᴍᴇ ᴄᴏᴍᴍᴀɴᴅs* 』─╮
 *┃*  😎 *${config.PREFIX}garl*
@@ -3590,6 +3732,9 @@ case 'logomenu': {
 *┃*  🗣️ *${config.PREFIX}tts*
 *┃*  🎬 *${config.PREFIX}ts*
 *┃*  🖼️ *${config.PREFIX}sticker*
+*┃*  🎵 *${config.PREFIX}shazam*
+*┃*  📤 *${config.PREFIX}tourl*
+*┃*  📁 *${config.PREFIX}mf*
 *╰──────────────⊷*
 
 *╭────〘 ɢʀᴏᴜᴘ 〙───⊷*
@@ -3602,6 +3747,12 @@ case 'logomenu': {
 *┃*  😢 *${config.PREFIX}demote*
 *┃*  👥 *${config.PREFIX}tagall*
 *┃*  👤 *${config.PREFIX}join*
+*┃*  📊 *${config.PREFIX}ginfo*
+*┃*  👥 *${config.PREFIX}members*
+*┃*  📢 *${config.PREFIX}togstatus*
+*┃*  📊 *${config.PREFIX}poll*
+*┃*  👋 *${config.PREFIX}welcome*
+*┃*  👋 *${config.PREFIX}goodbye*
 *╰──────────────⊷*
 
 *╭────〘 ɢᴀᴍᴇs 〙───⊷*
@@ -3627,9 +3778,11 @@ case 'logomenu': {
 *┃*  🔥 *${config.PREFIX}roast*
 *┃*  ❤️ *${config.PREFIX}lovequote*
 *┃*  💭 *${config.PREFIX}quote*
+*┃*  🎨 *${config.PREFIX}emojimix*
+*┃*  🎨 *${config.PREFIX}ascii*
 *╰──────────────⊷*
 
-*╭────〘 ᴀɪ ᴍᴇɴᴜ 〙───⊷*
+*╭────〘 ᴀɪ & ᴛᴏᴏʟs 〙───⊷*
 *┃*  🤖 *${config.PREFIX}ai*
 *┃*  📊 *${config.PREFIX}winfo*
 *┃*  🔍 *${config.PREFIX}whois*
@@ -3638,12 +3791,28 @@ case 'logomenu': {
 *┃*  📱 *${config.PREFIX}send*
 *┃*  💾 *${config.PREFIX}savestatus*
 *┃*  ✍️ *${config.PREFIX}setstatus*
-*┃*  🗑️ *${config.PREFIX}deleteme*
 *┃*  🌦️ *${config.PREFIX}weather*
 *┃*  🔗 *${config.PREFIX}shorturl*
 *┃*  📤 *${config.PREFIX}tourl2*
 *┃*  📦 *${config.PREFIX}apk*
 *┃*  📲 *${config.PREFIX}fc*
+*┃*  🌍 *${config.PREFIX}country*
+*┃*  🕐 *${config.PREFIX}time*
+*┃*  🌍 *${config.PREFIX}translate*
+*┃*  👤 *${config.PREFIX}profile*
+*┃*  📢 *${config.PREFIX}broadcast*
+*╰──────────────⊷*
+
+*╭────〘 ᴏᴡɴᴇʀ ᴛᴏᴏʟs 〙───⊷*
+*┃*  ⚡ *${config.PREFIX}eval*
+*┃*  🔰 *${config.PREFIX}antidelete*
+*┃*  🛡️ *${config.PREFIX}anticall*
+*┃*  📖 *${config.PREFIX}autoread*
+*┃*  👁️ *${config.PREFIX}bluetick*
+*┃*  📢 *${config.PREFIX}poststatus*
+*┃*  👁️ *${config.PREFIX}presence*
+*┃*  🖼️ *${config.PREFIX}setpp*
+*┃*  📊 *${config.PREFIX}session*
 *╰──────────────⊷*
 
 > *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs*
@@ -3651,7 +3820,8 @@ case 'logomenu': {
 
     const buttons = [
       {buttonId: `${config.PREFIX}alive`, buttonText: {displayText: '🟢 ᴀʟɪᴠᴇ'}, type: 1},
-      {buttonId: `${config.PREFIX}repo`, buttonText: {displayText: '📂 ʀᴇᴘᴏ'}, type: 1}
+      {buttonId: `${config.PREFIX}repo`, buttonText: {displayText: '📂 ʀᴇᴘᴏ'}, type: 1},
+      {buttonId: `${config.PREFIX}menu`, buttonText: {displayText: '📋 ᴍᴇɴᴜ'}, type: 1}
     ];
 
     const buttonMessage = {
@@ -4289,6 +4459,135 @@ case 'textart': {
     }
     break;
 }
+// Case: igstalk / instastalk / iginfo / instagramstalk - Instagram profile stalker
+case 'igstalk':
+case 'instastalk':
+case 'iginfo':
+case 'instagramstalk': {
+    try {
+        let username = args[0]?.replace(/^@/, '').trim();
+        
+        if (!username) {
+            await socket.sendMessage(sender, {
+                text: `📸 *ɪɴsᴛᴀɢʀᴀᴍ sᴛᴀʟᴋᴇʀ*\n\nɢᴇᴛ ᴅᴇᴛᴀɪʟᴇᴅ ɪɴsᴛᴀɢʀᴀᴍ ᴘʀᴏғɪʟᴇ ɪɴғᴏ.\n\n*ᴜsᴀɢᴇ:* \`${prefix}igstalk <username>\`\n\n*ᴇxᴀᴍᴘʟᴇs:*\n• \`${prefix}igstalk cristiano\`\n• \`${prefix}igstalk leomessi\`\n• \`${prefix}igstalk therock\`\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}igstalk cristiano`, buttonText: { displayText: '👤 ᴄʀɪsᴛɪᴀɴᴏ' }, type: 1 },
+                    { buttonId: `${prefix}igstalk leomessi`, buttonText: { displayText: '👤 ᴍᴇssɪ' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📸', key: msg.key } });
+
+        // Send fetching message
+        const fetchingMsg = await socket.sendMessage(sender, {
+            text: `⏳ *ғᴇᴛᴄʜɪɴɢ ɪɴsᴛᴀɢʀᴀᴍ ᴘʀᴏғɪʟᴇ...*\n\n@${username}`,
+            quoted: msg
+        });
+
+        // Fetch Instagram profile
+        const { data } = await axios.get(
+            `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
+            {
+                timeout: 12000,
+                headers: {
+                    'User-Agent': 'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 458229258)',
+                    'Accept': 'application/json',
+                    'x-ig-app-id': '936619743392459',
+                    'Accept-Language': 'en-US,en;q=0.9'
+                }
+            }
+        );
+
+        const u = data?.data?.user;
+        if (!u) throw new Error('No user data');
+
+        // Delete fetching message
+        try { await socket.sendMessage(sender, { delete: fetchingMsg.key }); } catch {}
+
+        const followers = u.edge_followed_by?.count ?? 0;
+        const following = u.edge_follow?.count ?? 0;
+        const posts = u.edge_owner_to_timeline_media?.count ?? 0;
+
+        function fmtNum(n) {
+            if (n === undefined || n === null) return 'N/A';
+            if (n >= 1000000000) return (n / 1000000000).toFixed(1) + 'B';
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+            return String(n);
+        }
+
+        const profileText =
+            `📸 *ɪɴsᴛᴀɢʀᴀᴍ ᴘʀᴏғɪʟᴇ*\n\n` +
+            `*🆔 ɪᴅᴇɴᴛɪᴛʏ*\n` +
+            `• *ᴜsᴇʀɴᴀᴍᴇ:* @${u.username}\n` +
+            `${u.full_name ? `• *ɴᴀᴍᴇ:* ${u.full_name}\n` : ''}` +
+            `${u.biography ? `\n*📝 ʙɪᴏ:*\n${u.biography.slice(0, 200)}\n` : ''}` +
+            `\n*📊 sᴛᴀᴛs*\n` +
+            `• *ғᴏʟʟᴏᴡᴇʀs:* ${fmtNum(followers)}\n` +
+            `• *ғᴏʟʟᴏᴡɪɴɢ:* ${fmtNum(following)}\n` +
+            `• *ᴘᴏsᴛs:* ${fmtNum(posts)}\n` +
+            `\n*⚙️ ɪɴғᴏ*\n` +
+            `• *ᴘʀɪᴠᴀᴛᴇ:* ${u.is_private ? '🔒 Yes' : '🔓 No'}\n` +
+            `• *ᴠᴇʀɪғɪᴇᴅ:* ${u.is_verified ? '✅ Yes' : '❌ No'}\n` +
+            `• *ʙᴜsɪɴᴇss:* ${u.is_business_account ? '🏢 Yes' : '👤 No'}\n` +
+            `${u.external_url ? `• *ʟɪɴᴋ:* ${u.external_url}\n` : ''}` +
+            `\n• *ᴘʀᴏғɪʟᴇ:* https://www.instagram.com/${u.username}/\n\n` +
+            `> ${config.BOT_FOOTER}`;
+
+        const picUrl = u.profile_pic_url_hd || u.profile_pic_url || null;
+
+        if (picUrl) {
+            await socket.sendMessage(sender, {
+                image: { url: picUrl },
+                caption: profileText,
+                buttons: [
+                    { buttonId: `https://www.instagram.com/${u.username}/`, buttonText: { displayText: '📸 ᴠɪᴇᴡ ᴘʀᴏғɪʟᴇ' }, type: 1 },
+                    { buttonId: `${prefix}igstalk`, buttonText: { displayText: '🔍 sᴛᴀʟᴋ ᴀɢᴀɪɴ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        } else {
+            await socket.sendMessage(sender, {
+                text: profileText,
+                buttons: [
+                    { buttonId: `https://www.instagram.com/${u.username}/`, buttonText: { displayText: '📸 ᴠɪᴇᴡ ᴘʀᴏғɪʟᴇ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[IGStalk] Error:', error.message);
+
+        if (error.response?.status === 404) {
+            await socket.sendMessage(sender, {
+                text: `❌ *ᴜsᴇʀ ɴᴏᴛ ғᴏᴜɴᴅ*\n\nᴛʜᴇ ɪɴsᴛᴀɢʀᴀᴍ ᴜsᴇʀ *@${args[0]}* ᴅᴏᴇs ɴᴏᴛ ᴇxɪsᴛ.`,
+                quoted: msg
+            });
+        } else if (error.response?.status === 429) {
+            await socket.sendMessage(sender, {
+                text: `⏳ *ʀᴀᴛᴇ ʟɪᴍɪᴛᴇᴅ*\n\nɪɴsᴛᴀɢʀᴀᴍ ɪs ʀᴀᴛᴇ-ʟɪᴍɪᴛɪɴɢ ᴛʜɪs ʀᴇϙᴜᴇsᴛ. ᴡᴀɪᴛ ᴀ ғᴇᴡ ᴍɪɴᴜᴛᴇs ᴀɴᴅ ᴛʀʏ ᴀɢᴀɪɴ.`,
+                quoted: msg
+            });
+        } else {
+            await socket.sendMessage(sender, {
+                text: `❌ *ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+                buttons: [
+                    { buttonId: `${prefix}igstalk`, buttonText: { displayText: '🔄 ʀᴇᴛʀʏ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        }
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
 // Case: pair
 // Case: pair
 case 'pair': {
@@ -4571,6 +4870,66 @@ case 'details': {
         await socket.sendMessage(sender, {
             text: '❌ *Failed to read quoted message details!*'
         }, { quoted: fakevCard });
+    }
+    break;
+}
+// Case: horoscope / zodiac / horo - Get daily horoscope
+case 'horoscope':
+case 'zodiac':
+case 'horo': {
+    try {
+        const SIGNS = ['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces'];
+        const EMOJIS = { aries:'♈',taurus:'♉',gemini:'♊',cancer:'♋',leo:'♌',virgo:'♍',libra:'♎',scorpio:'♏',sagittarius:'♐',capricorn:'♑',aquarius:'♒',pisces:'♓' };
+
+        const sign = (args[0] || '').toLowerCase();
+        
+        if (!sign || !SIGNS.includes(sign)) {
+            await socket.sendMessage(sender, {
+                text: `🔮 *ʜᴏʀᴏsᴄᴏᴘᴇ*\n\nɢᴇᴛ ʏᴏᴜʀ ᴅᴀɪʟʏ ʜᴏʀᴏsᴄᴏᴘᴇ.\n\n*ᴜsᴀɢᴇ:* \`${prefix}horo <sign>\`\n\n*ᴢᴏᴅɪᴀᴄ sɪɢɴs:*\n${SIGNS.map(s => `${EMOJIS[s]} ${s}`).join(', ')}\n\n*ᴇxᴀᴍᴘʟᴇ:* \`${prefix}horo leo\`\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}horo leo`, buttonText: { displayText: '♌ ʟᴇᴏ' }, type: 1 },
+                    { buttonId: `${prefix}horo gemini`, buttonText: { displayText: '♊ ɢᴇᴍɪɴɪ' }, type: 1 },
+                    { buttonId: `${prefix}horo scorpio`, buttonText: { displayText: '♏ sᴄᴏʀᴘɪᴏ' }, type: 1 },
+                    { buttonId: `${prefix}horo pisces`, buttonText: { displayText: '♓ ᴘɪsᴄᴇs' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🔮', key: msg.key } });
+
+        const { data } = await axios.get(
+            `https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily?sign=${sign}&day=TODAY`,
+            { timeout: 10000 }
+        );
+        
+        const h = data?.data;
+        const date = h?.date || new Date().toDateString();
+        const horoscopeText = h?.horoscope_data || 'No horoscope available today.';
+
+        await socket.sendMessage(sender, {
+            text: `${EMOJIS[sign]} *${sign.charAt(0).toUpperCase() + sign.slice(1)} ᴅᴀɪʟʏ ʜᴏʀᴏsᴄᴏᴘᴇ*\n📅 ${date}\n\n${horoscopeText}\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}horo`, buttonText: { displayText: '🔮 ᴀɴᴏᴛʜᴇʀ sɪɢɴ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Horoscope] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ʜᴏʀᴏsᴄᴏᴘᴇ ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+            buttons: [
+                { buttonId: `${prefix}horo`, buttonText: { displayText: '🔄 ʀᴇᴛʀʏ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
 }
@@ -8675,181 +9034,83 @@ case 'truthordare': {
 }
 
 //===============================
-case 'fbdl':
+// Case: facebook / fb / fbdl - Download Facebook video
 case 'facebook':
-case 'fbvideo':
-case 'fb': {
+case 'fb':
+case 'fbdl': {
     try {
-        const axios = require('axios');
+        const url = args[0];
         
-        // Extract query from message
-        const q = msg.message?.conversation || 
-                  msg.message?.extendedTextMessage?.text || 
-                  msg.message?.imageMessage?.caption || 
-                  msg.message?.videoMessage?.caption || '';
-        
-        const args = q.split(' ').slice(1);
-        const fbUrl = args[0];
-
-        if (!fbUrl || !fbUrl.includes("facebook.com")) {
-            return await socket.sendMessage(sender, {
-                text: '❌ *Please provide a valid Facebook video URL.*\nExample: .fbdl https://facebook.com/video/123'
-            }, { quoted: msg });
+        if (!url) {
+            await socket.sendMessage(sender, {
+                text: `📘 *ғᴀᴄᴇʙᴏᴏᴋ ᴅᴏᴡɴʟᴏᴀᴅᴇʀ*\n\nᴅᴏᴡɴʟᴏᴀᴅ ғᴀᴄᴇʙᴏᴏᴋ ᴠɪᴅᴇᴏs.\n\n*ᴜsᴀɢᴇ:* \`${prefix}fb <url>\`\n\n*ᴇxᴀᴍᴘʟᴇ:*\n\`${prefix}fb https://www.facebook.com/...\`\n\n> ${config.BOT_FOOTER}`,
+                quoted: msg
+            });
+            break;
         }
 
-        // Send processing reaction
-        await socket.sendMessage(sender, {
-            react: {
-                text: "⏳",
-                key: msg.key
-            }
+        const urlRegex = /^(?:https?:\/\/)?(?:www\.)?(?:facebook\.com|fb\.watch|m\.facebook\.com)\b/i;
+        if (!urlRegex.test(url)) {
+            await socket.sendMessage(sender, {
+                text: `⚠️ *ɪɴᴠᴀʟɪᴅ ᴜʀʟ*\n\nᴘʟᴇᴀsᴇ ᴘʀᴏᴠɪᴅᴇ ᴀ ᴠᴀʟɪᴅ ғᴀᴄᴇʙᴏᴏᴋ ᴜʀʟ.\n\n*ᴇxᴀᴍᴘʟᴇ:*\n\`${prefix}fb https://www.facebook.com/...\``,
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📘', key: msg.key } });
+
+        const downloadingMsg = await socket.sendMessage(sender, {
+            text: '📥 *ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ғᴀᴄᴇʙᴏᴏᴋ ᴠɪᴅᴇᴏ...*',
+            quoted: msg
         });
 
-        // Prepare the primary API URL
-        const primaryApiUrl = `https://apis.davidcyriltech.my.id/facebook2?url=${encodeURIComponent(fbUrl)}`;
-        
-        // Prepare fallback APIs
-        const fallbackApis = [
-            `https://kaiz-apis.gleeze.com/api/fbdl?url=${encodeURIComponent(fbUrl)}&apikey=cf2ca612-296f-45ba-abbc-473f18f991eb`,
-            `https://api.giftedtech.web.id/api/download/facebook?apikey=gifted&url=${encodeURIComponent(fbUrl)}`
-        ];
-
-        let videoData = null;
-        let apiIndex = 0;
-        const apis = [primaryApiUrl, ...fallbackApis];
-
-        // Try each API until we get a successful response
-        while (apiIndex < apis.length && !videoData) {
-            try {
-                const response = await axios.get(apis[apiIndex], { timeout: 15000 });
-                
-                // Parse response based on which API responded
-                if (apiIndex === 0) {
-                    // Primary API response format
-                    if (response.data && response.data.status && response.data.video) {
-                        const { title, thumbnail, downloads } = response.data.video;
-                        videoData = {
-                            title: title || "Facebook Video",
-                            thumbnail,
-                            downloadUrl: downloads.find(d => d.quality === "HD")?.downloadUrl || downloads[0]?.downloadUrl,
-                            quality: downloads.find(d => d.quality === "HD") ? "HD" : "SD"
-                        };
-                    }
-                } else if (apiIndex === 1) {
-                    // Kaiz API response format
-                    if (response.data && response.data.videoUrl) {
-                        videoData = {
-                            title: response.data.title || "Facebook Video",
-                            thumbnail: response.data.thumbnail,
-                            downloadUrl: response.data.videoUrl,
-                            quality: response.data.quality || "HD"
-                        };
-                    }
-                } else if (apiIndex === 2) {
-                    // GiftedTech API response format
-                    if (response.data && response.data.success && response.data.result) {
-                        const result = response.data.result;
-                        videoData = {
-                            title: result.title || "Facebook Video",
-                            thumbnail: result.thumbnail,
-                            downloadUrl: result.hd_video || result.sd_video,
-                            quality: result.hd_video ? "HD" : "SD"
-                        };
-                    }
-                }
-            } catch (error) {
-                console.error(`Error with API ${apiIndex}:`, error.message);
-            }
-            apiIndex++;
-        }
-
-        if (!videoData) {
-            await socket.sendMessage(sender, {
-                react: {
-                    text: "❌",
-                    key: msg.key
-                }
-            });
-            return await socket.sendMessage(sender, {
-                text: '❌ *All download services failed.*\nPlease try again later or use a different Facebook URL.'
-            }, { quoted: msg });
-        }
-
-        // Send downloading message
-        const loadingMsg = await socket.sendMessage(sender, {
-            text: '⏳ *Downloading Facebook video... Please wait* 📥'
-        }, { quoted: msg });
-
-        try {
-            // Download the video with timeout
-            const videoResponse = await axios.get(videoData.downloadUrl, { 
-                responseType: 'arraybuffer',
-                timeout: 30000,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-            });
-            
-            if (!videoResponse.data) {
-                throw new Error('Empty video response');
-            }
-
-            // Prepare the video buffer
-            const videoBuffer = Buffer.from(videoResponse.data, 'binary');
-
-            // Send the video with details
-            await socket.sendMessage(sender, {
-                video: videoBuffer,
-                caption: `📥 *Facebook Video Download*\n\n` +
-                    `🔖 *Title:* ${videoData.title}\n` +
-                    `📏 *Quality:* ${videoData.quality}\n\n` +
-                    `> ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs xᴛᴇᴄʜ`,
-                contextInfo: {
-                    mentionedJid: [msg.key.participant || msg.key.remoteJid],
-                    externalAdReply: {
-                        title: 'Facebook Video Download',
-                        body: `Quality: ${videoData.quality}`,
-                        mediaType: 2,
-                        sourceUrl: fbUrl,
-                        thumbnailUrl: videoData.thumbnail
-                    }
-                }
-            }, { quoted: msg });
-
-            // Delete the loading message
-            await socket.sendMessage(sender, {
-                delete: loadingMsg.key
-            });
-
-            // Send success reaction
-            await socket.sendMessage(sender, {
-                react: {
-                    text: "✅",
-                    key: msg.key
-                }
-            });
-
-        } catch (downloadError) {
-            console.error('Video download failed:', downloadError);
-            await socket.sendMessage(sender, {
-                text: '❌ *Failed to download video.*\nThe video might be too large or restricted.'
-            }, { quoted: msg });
-        }
-
-    } catch (error) {
-        console.error('Facebook download error:', error);
-        
-        // Send error reaction
-        await socket.sendMessage(sender, {
-            react: {
-                text: "❌",
-                key: msg.key
-            }
+        const apiUrl = `https://api.nexoracle.com/downloaders/fbdl?url=${encodeURIComponent(url)}&apikey=free_for_use`;
+        const { data } = await axios.get(apiUrl, {
+            timeout: 30000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
         });
 
+        const videoUrl = data?.result?.hd || data?.result?.sd || data?.link;
+        if (!videoUrl) throw new Error('Could not extract video URL. The link may be private or unsupported.');
+
+        const title = data?.result?.title || 'Facebook Video';
+
+        // Delete downloading message
+        try { await socket.sendMessage(sender, { delete: downloadingMsg.key }); } catch {}
+
         await socket.sendMessage(sender, {
-            text: '❌ *Unable to process Facebook video.*\nPlease check the URL and try again later.'
+            video: { url: videoUrl },
+            caption: `📘 *ғᴀᴄᴇʙᴏᴏᴋ ᴠɪᴅᴇᴏ*\n\n📌 *ᴛɪᴛʟᴇ:* ${title}\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}fb`, buttonText: { displayText: '📘 ᴅᴏᴡɴʟᴏᴀᴅ ᴀɢᴀɪɴ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1,
+            contextInfo: {
+                externalAdReply: {
+                    title: 'ғᴀᴄᴇʙᴏᴏᴋ ᴅᴏᴡɴʟᴏᴀᴅᴇʀ',
+                    body: 'ᴘᴏᴡᴇʀᴇᴅ ʙʏ ' + config.OWNER_NAME,
+                    thumbnailUrl: config.RCD_IMAGE_PATH,
+                    sourceUrl: url,
+                    mediaType: 1,
+                    renderLargerThumbnail: true
+                }
+            }
         }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (err) {
+        console.error('[Facebook] Error:', err.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ғᴀᴄᴇʙᴏᴏᴋ ᴅᴏᴡɴʟᴏᴀᴅ ғᴀɪʟᴇᴅ*\n\n${err.message}\n\n*ᴛɪᴘs:*\n• ᴇɴsᴜʀᴇ ᴛʜᴇ ᴠɪᴅᴇᴏ ɪs ᴘᴜʙʟɪᴄ\n• ᴛʀʏ ᴀ ᴅɪғғᴇʀᴇɴᴛ ʟɪɴᴋ`,
+            buttons: [
+                { buttonId: `${prefix}fb`, buttonText: { displayText: '🔄 ʀᴇᴛʀʏ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
 }
