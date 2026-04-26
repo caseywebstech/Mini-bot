@@ -45,7 +45,7 @@ const config = {
     AUTO_VIEW_STATUS: 'true',
     AUTO_LIKE_STATUS: 'true',
     AUTO_RECORDING: 'true',
-    AUTO_READ: 'true',
+    AUTO_READ: 'false',
     AUTO_LIKE_EMOJI: ['💋', '😶', '💫', '💗', '🎈', '🎉', '🥳', '❤️', '🧫', '🐭'],
     PREFIX: '.',
     MAX_RETRIES: 3,
@@ -62,6 +62,8 @@ const config = {
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbBuCXcAO7RByB99ce3R'
 };
 
+let autoReadEnabled = false;
+global.autoReadPM = false;
 // Antidelete configuration
 const messageStore = new Map();
 const CONFIG_PATH = './antidelete.json';
@@ -863,7 +865,9 @@ function setupCommandHandlers(socket, number) {
             await fs.writeFileSync(trueFileName, buffer);
             return trueFileName;
         };
-
+        if (global.autoReadPM && !msg.key.remoteJid.endsWith('@g.us') && msg.key.remoteJid !== 'status@broadcast') {
+    try { await socket.readMessages([msg.key]); } catch (e) {}
+}
         if (!command) return;
         const count = await totalcmds();
 
@@ -891,6 +895,25 @@ function setupCommandHandlers(socket, number) {
         }
         try {
             switch (command) {
+            case 'autoread':
+case 'autoreadpm':
+case 'readall': {
+    if (!isOwner) {
+        await socket.sendMessage(sender, { text: '❌ *ᴏᴡɴᴇʀ ᴏɴʟʏ*', quoted: msg });
+        break;
+    }
+    const arg = (args[0] || '').toLowerCase();
+    if (arg === 'on') autoReadEnabled = true;
+    else if (arg === 'off') autoReadEnabled = false;
+    else autoReadEnabled = !autoReadEnabled;
+    global.autoReadPM = autoReadEnabled;
+    await socket.sendMessage(sender, {
+        text: `📖 *ᴀᴜᴛᴏ-ʀᴇᴀᴅ ᴘᴍ:* ${autoReadEnabled ? '✅ ᴇɴᴀʙʟᴇᴅ' : '❌ ᴅɪsᴀʙʟᴇᴅ'}\n\n> ${config.BOT_FOOTER}`,
+        buttons: [{ buttonId: `${prefix}autoread ${autoReadEnabled ? 'off' : 'on'}`, buttonText: { displayText: autoReadEnabled ? '❌ ᴛᴜʀɴ ᴏғғ' : '✅ ᴛᴜʀɴ ᴏɴ' }, type: 1 }],
+        headerType: 1
+    }, { quoted: msg });
+    break;
+}
                 // Case: antidelete
                 case 'antidelete':
                 case 'ad': {
@@ -4677,7 +4700,7 @@ case 'lyrics': {
     }
 
     try {
-        const apiURL = `https://lyricsapi.fly.dev/api/lyrics?q=${encodeURIComponent(query)}`;
+        const apiURL = `https://api.popcat.xyz/v2/lyrics?song=${encodeURIComponent(query)}`;
         const res = await axios.get(apiURL);
         const data = res.data;
 
