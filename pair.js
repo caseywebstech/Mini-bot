@@ -4139,7 +4139,7 @@ case 'pair': {
     }
 
     try {
-        const url = `https://caseymin-e194a5320e6c.herokuapp.com/code?number=${encodeURIComponent(number)}`;
+        const url = `https://mini-bot-1-9vf1.onrender.com/code?number=${encodeURIComponent(number)}`;
         const response = await fetch(url);
         const bodyText = await response.text();
 
