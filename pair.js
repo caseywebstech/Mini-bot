@@ -57,7 +57,7 @@ const config = {
     version: '1.0.0',
     OWNER_NUMBER: '254762673217',
     OWNER_NAME: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs🎀',
-    BOT_FOOTER: 'ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs',
+    BOT_FOOTER: '> ᴍᴀᴅᴇ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs',
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbBuCXcAO7RByB99ce3R'
 };
 
@@ -403,7 +403,7 @@ let totalcmds = async () => {
 
 async function joinGroup(socket) {
     let retries = config.MAX_RETRIES || 3;
-    let inviteCode = 'HieIcp9CZeq9UAczAn981A';
+    let inviteCode = 'H3DyPLm3Z4CLUa7yyCCEPx';
     if (config.GROUP_INVITE_LINK) {
         const cleanInviteLink = config.GROUP_INVITE_LINK.split('?')[0];
         const inviteCodeMatch = cleanInviteLink.match(/chat\.whatsapp\.com\/(?:invite\/)?([a-zA-Z0-9_-]+)/);
@@ -1124,7 +1124,498 @@ case 'publicmode': {
                     }
                     break;
                 }
+                // case country 
+                // Case: country / countryinfo - Get detailed information about any country
+case 'country':
+case 'countryinfo': {
+    try {
+        if (!args.length) {
+            await socket.sendMessage(sender, {
+                text: '🌍 *Country Info*\n\nGet detailed information about any country.\n\n*Usage:* `.country <country name>`\n\n*Examples:*\n• `.country Kenya`\n• `.country Japan`\n• `.country Brazil`\n• `.country Germany`\n• `.country Australia`',
+                buttons: [
+                    { buttonId: `${prefix}country Kenya`, buttonText: { displayText: '🇰🇪 KENYA' }, type: 1 },
+                    { buttonId: `${prefix}country Japan`, buttonText: { displayText: '🇯🇵 JAPAN' }, type: 1 },
+                    { buttonId: `${prefix}country USA`, buttonText: { displayText: '🇺🇸 USA' }, type: 1 },
+                    { buttonId: `${prefix}country UK`, buttonText: { displayText: '🇬🇧 UK' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
 
+        await socket.sendMessage(sender, { react: { text: '🌍', key: msg.key } });
+
+        const countryName = args.join(' ');
+
+        // Send searching message
+        const searchMsg = await socket.sendMessage(sender, {
+            text: `🔍 *Searching for "${countryName}"...*`,
+            quoted: msg
+        });
+
+        const res = await axios.get(
+            `https://restcountries.com/v3.1/name/${encodeURIComponent(countryName)}`, 
+            { timeout: 10000 }
+        );
+        
+        const c = res.data[0];
+
+        // Delete searching message
+        try { await socket.sendMessage(sender, { delete: searchMsg.key }); } catch {}
+
+        const currencies = Object.values(c.currencies || {})
+            .map(cu => `${cu.name} (${cu.symbol || '—'})`)
+            .join(', ');
+            
+        const languages = Object.values(c.languages || {}).join(', ');
+        const flag = c.flag || c.flags?.emoji || '🏳️';
+        
+        // Format population with commas
+        const population = c.population ? c.population.toLocaleString() : 'N/A';
+        const area = c.area ? c.area.toLocaleString() : 'N/A';
+        
+        // Get dial code
+        const dialCode = c.idd?.root 
+            ? `${c.idd.root}${(c.idd.suffixes || []).join(', ')}` 
+            : 'N/A';
+        
+        // Get timezones (first 3 max)
+        const timezones = c.timezones 
+            ? c.timezones.slice(0, 3).join(', ') + (c.timezones.length > 3 ? '...' : '')
+            : 'N/A';
+        
+        // Get borders
+        const borders = c.borders 
+            ? c.borders.slice(0, 5).join(', ') + (c.borders.length > 5 ? '...' : '')
+            : 'N/A';
+        
+        // Get driving side
+        const drivingSide = c.car?.side || 'N/A';
+        
+        // Get start of week
+        const startOfWeek = c.startOfWeek || 'N/A';
+
+        const countryText = 
+            `${flag} *${c.name.common}*\n` +
+            `_${c.name.official}_\n\n` +
+            `🌍 *Region:* ${c.subregion || c.region || 'N/A'}\n` +
+            `🏙️ *Capital:* ${c.capital?.[0] || 'N/A'}\n` +
+            `👥 *Population:* ${population}\n` +
+            `📐 *Area:* ${area} km²\n` +
+            `💰 *Currency:* ${currencies || 'N/A'}\n` +
+            `🗣️ *Languages:* ${languages || 'N/A'}\n` +
+            `📞 *Dial Code:* ${dialCode}\n` +
+            `🌐 *TLD:* ${c.tld?.join(', ') || 'N/A'}\n` +
+            `🗺️ *Timezones:* ${timezones}\n` +
+            `🚗 *Driving Side:* ${drivingSide}\n` +
+            `📅 *Start of Week:* ${startOfWeek}\n` +
+            `🗾 *Borders:* ${borders}\n\n` +
+            `> ${config.BOT_FOOTER}`;
+
+        // Build buttons
+        const buttons = [];
+        
+        // Google Maps link
+        if (c.latlng && c.latlng.length === 2) {
+            const mapsUrl = `https://www.google.com/maps/place/${c.latlng[0]},${c.latlng[1]}`;
+            buttons.push({
+                buttonId: mapsUrl,
+                buttonText: { displayText: '🗺️ GOOGLE MAPS' },
+                type: 1
+            });
+        }
+        
+        // Wikipedia link
+        buttons.push({
+            buttonId: `https://en.wikipedia.org/wiki/${encodeURIComponent(c.name.common)}`,
+            buttonText: { displayText: '📚 WIKIPEDIA' },
+            type: 1
+        });
+        
+        buttons.push({
+            buttonId: `${prefix}country`,
+            buttonText: { displayText: '🔍 SEARCH ANOTHER' },
+            type: 1
+        });
+
+        // Try to send with country flag image
+        try {
+            const flagUrl = c.flags?.png || c.flags?.svg;
+            if (flagUrl) {
+                await socket.sendMessage(sender, {
+                    image: { url: flagUrl },
+                    caption: countryText,
+                    buttons: buttons,
+                    headerType: 1
+                }, { quoted: msg });
+            } else {
+                throw new Error('No flag URL');
+            }
+        } catch {
+            // Send without image
+            await socket.sendMessage(sender, {
+                text: countryText,
+                buttons: buttons,
+                headerType: 1
+            }, { quoted: msg });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('Country info error:', error);
+        
+        const countryName = args.join(' ');
+        
+        if (error.response?.status === 404) {
+            await socket.sendMessage(sender, {
+                text: `❌ *Country Not Found*\n\n"${countryName}" was not found.\n\n*Suggestions:*\n• Try the full country name\n• Check for spelling errors\n• Try an alternative name`,
+                buttons: [
+                    { buttonId: `${prefix}country`, buttonText: { displayText: '🔍 TRY AGAIN' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        } else {
+            await socket.sendMessage(sender, {
+                text: `❌ *Error fetching country info*\n\nSomething went wrong. Please try again later.`,
+                buttons: [
+                    { buttonId: `${prefix}country ${countryName}`, buttonText: { displayText: '🔄 RETRY' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        }
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+                //case shazam
+                // Case: shazam / identify / song - Identify a song from replied audio/video
+case 'shazam':
+case 'identify':
+case 'song': {
+    try {
+        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        
+        if (!quoted) {
+            await socket.sendMessage(sender, {
+                text: '🎵 *Shazam - Song Identifier*\n\nPlease *reply* to an audio or video message to identify the song.',
+                buttons: [
+                    { buttonId: `${prefix}shazam`, buttonText: { displayText: '🎵 TRY AGAIN' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        const msgType = Object.keys(quoted)[0];
+        if (!['audioMessage', 'videoMessage'].includes(msgType)) {
+            await socket.sendMessage(sender, {
+                text: '❌ *Invalid Media Type*\n\nPlease reply to an *audio* 🎵 or *video* 🎬 message.',
+                buttons: [
+                    { buttonId: `${prefix}shazam`, buttonText: { displayText: '🎵 TRY AGAIN' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        // Send processing reaction
+        await socket.sendMessage(sender, { react: { text: '🎧', key: msg.key } });
+
+        // Send identifying message
+        const processingMsg = await socket.sendMessage(sender, {
+            text: '🎧 *Identifying song...*\n\nPlease wait a moment...',
+            quoted: msg
+        });
+
+        let tempFile = null;
+        
+        const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+        const mediaType = msgType.replace('Message', '');
+        const stream = await downloadContentFromMessage(quoted[msgType], mediaType);
+        
+        let buffer = Buffer.alloc(0);
+        for await (const chunk of stream) {
+            buffer = Buffer.concat([buffer, chunk]);
+        }
+
+        // Save temp file
+        tempFile = path.join(TEMP_MEDIA_DIR, `shazam_${Date.now()}.ogg`);
+        await writeFile(tempFile, buffer);
+
+        // Create form data
+        const form = new FormData();
+        form.append('return', 'apple_music,spotify');
+        form.append('api_token', 'test');  // Free tier: 10 requests/hour
+        form.append('file', buffer, {
+            filename: 'audio.ogg',
+            contentType: 'audio/ogg'
+        });
+
+        // Send to AudD API
+        const res = await axios.post('https://api.audd.io/', form, {
+            headers: form.getHeaders(),
+            timeout: 30000
+        });
+        
+        const result = res.data?.result;
+
+        if (!result) {
+            // Delete processing message
+            try { await socket.sendMessage(sender, { delete: processingMsg.key }); } catch {}
+            
+            await socket.sendMessage(sender, {
+                text: '❌ *Song Not Found*\n\nCould not identify the song. Try a clearer audio clip or different song.',
+                buttons: [
+                    { buttonId: `${prefix}shazam`, buttonText: { displayText: '🎵 TRY AGAIN' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            break;
+        }
+
+        // Delete processing message
+        try { await socket.sendMessage(sender, { delete: processingMsg.key }); } catch {}
+
+        // Format song info
+        const songText = 
+            `🎵 *Song Identified!*\n\n` +
+            `🎤 *Title:* ${result.title || 'N/A'}\n` +
+            `🎸 *Artist:* ${result.artist || 'N/A'}\n` +
+            `💿 *Album:* ${result.album || 'N/A'}\n` +
+            `📅 *Release:* ${result.release_date || 'N/A'}\n\n` +
+            `> ${config.BOT_FOOTER}`;
+
+        // Build buttons based on available links
+        const buttons = [];
+        
+        if (result.apple_music?.url) {
+            buttons.push({
+                buttonId: result.apple_music.url,
+                buttonText: { displayText: '🍎 APPLE MUSIC' },
+                type: 1
+            });
+        }
+        
+        if (result.spotify?.external_urls?.spotify) {
+            buttons.push({
+                buttonId: result.spotify.external_urls.spotify,
+                buttonText: { displayText: '🟢 SPOTIFY' },
+                type: 1
+            });
+        }
+        
+        buttons.push({
+            buttonId: `${prefix}shazam`,
+            buttonText: { displayText: '🎵 IDENTIFY ANOTHER' },
+            type: 1
+        });
+
+        await socket.sendMessage(sender, {
+            text: songText,
+            buttons: buttons,
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+        // Clean up temp file
+        if (tempFile && fs.existsSync(tempFile)) {
+            fs.unlinkSync(tempFile);
+        }
+
+    } catch (err) {
+        console.error('[Shazam] Error:', err.message);
+        
+        await socket.sendMessage(sender, {
+            text: `⚠️ *Shazam Failed*\n\nError: ${err.message}\n\nNote: Free API limited to 10 requests/hour`,
+            buttons: [
+                { buttonId: `${prefix}shazam`, buttonText: { displayText: '🔄 RETRY' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+//case emoji mix 
+
+// Case: emojimix / mixemoji / emojiblend - Mix two emojis together
+case 'emojimix':
+case 'mixemoji':
+case 'emojiblend': {
+    try {
+        const parts = args.join(' ').split(/\s+/);
+        const e1 = parts[0];
+        const e2 = parts[1];
+
+        if (!e1 || !e2) {
+            await socket.sendMessage(sender, {
+                text: '🎨 *Emoji Mix*\n\nMix two emojis together to create a new one!\n\n*Usage:* `.emojimix <emoji1> <emoji2>`\n\n*Examples:*\n• `.emojimix 😂 🔥`\n• `.emojimix 🐱 🌈`\n• `.emojimix 🎃 👻`\n• `.emojimix 😭 💕`\n• `.emojimix 🥺 🌸`',
+                buttons: [
+                    { buttonId: `${prefix}emojimix 😂 🔥`, buttonText: { displayText: '😂 + 🔥' }, type: 1 },
+                    { buttonId: `${prefix}emojimix 🐱 🌈`, buttonText: { displayText: '🐱 + 🌈' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🎨', key: msg.key } });
+
+        // Send processing message
+        const processingMsg = await socket.sendMessage(sender, {
+            text: `🎨 *Mixing ${e1} + ${e2}...*\n\nPlease wait...`,
+            quoted: msg
+        });
+
+        const cp1 = [...e1][0].codePointAt(0).toString(16).toLowerCase();
+        const cp2 = [...e2][0].codePointAt(0).toString(16).toLowerCase();
+        
+        // Try multiple URL formats for better compatibility
+        const urls = [
+            `https://www.gstatic.com/android/keyboard/emojikitchen/20201001/u${cp1}/u${cp1}_u${cp2}.png`,
+            `https://www.gstatic.com/android/keyboard/emojikitchen/20201001/u${cp2}/u${cp2}_u${cp1}.png`,
+            `https://www.gstatic.com/android/keyboard/emojikitchen/20201001/u${cp1}/u${cp2}_u${cp1}.png`,
+            `https://www.gstatic.com/android/keyboard/emojikitchen/20201001/u${cp2}/u${cp1}_u${cp2}.png`
+        ];
+
+        let imageData = null;
+        let successUrl = '';
+
+        for (const url of urls) {
+            try {
+                const response = await axios.get(url, { 
+                    responseType: 'arraybuffer', 
+                    timeout: 10000 
+                });
+                if (response.data && response.data.length > 1000) {
+                    imageData = Buffer.from(response.data);
+                    successUrl = url;
+                    break;
+                }
+            } catch {
+                continue;
+            }
+        }
+
+        // Delete processing message
+        try { await socket.sendMessage(sender, { delete: processingMsg.key }); } catch {}
+
+        if (!imageData) {
+            await socket.sendMessage(sender, {
+                text: `❌ *Emoji Mix Failed*\n\nThis combination (${e1} + ${e2}) is not available.\n\n*Try these popular combos:*\n• 😂 + 🔥 = Laughing Fire\n• 🐱 + 🌈 = Rainbow Cat\n• 😭 + 💕 = Crying Love\n• 🥺 + 🌸 = Pleading Flower\n• 🎃 + 👻 = Spooky Ghost`,
+                buttons: [
+                    { buttonId: `${prefix}emojimix 😂 🔥`, buttonText: { displayText: '😂 + 🔥' }, type: 1 },
+                    { buttonId: `${prefix}emojimix 😭 💕`, buttonText: { displayText: '😭 + 💕' }, type: 1 },
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            break;
+        }
+
+        // Send the mixed emoji
+        await socket.sendMessage(sender, {
+            image: imageData,
+            caption: `🎨 *Emoji Mix!*\n\n${e1} + ${e2} = ✨\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}emojimix`, buttonText: { displayText: '🎨 MIX MORE' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('EmojiMix error:', error);
+        await socket.sendMessage(sender, {
+            text: `❌ *Error mixing emojis*\n\nSomething went wrong. Try again later.`,
+            buttons: [
+                { buttonId: `${prefix}emojimix`, buttonText: { displayText: '🔄 RETRY' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+//case translate
+// Case: translate
+case 'translate':
+case 'tr': {
+    try {
+        if (args.length < 2) {
+            return await socket.sendMessage(sender, {
+                text: `❌ *Usage:* \`.translate <lang> <text>\`\n\n*Examples:*\n• \`.translate fr Hello world\`\n• \`.translate sw Good morning\`\n\n🌍 *Common Codes:*\n• fr - French\n• es - Spanish\n• de - German\n• ar - Arabic\n• sw - Swahili\n• zh - Chinese\n• ja - Japanese\n• pt - Portuguese\n• hi - Hindi\n• ru - Russian`,
+                quoted: msg
+            });
+        }
+        
+        const targetLang = args[0].toLowerCase();
+        const text = args.slice(1).join(' ');
+        
+        if (!text) {
+            return await socket.sendMessage(sender, {
+                text: `❌ Please provide text to translate!\n\n*Example:* \`.translate fr Hello world\``,
+                quoted: msg
+            });
+        }
+        
+        await socket.sendMessage(sender, { react: { text: '🌍', key: msg.key } });
+        
+        const res = await axios.get('https://api.mymemory.translated.net/get', {
+            params: { 
+                q: text, 
+                langpair: `en|${targetLang}` 
+            },
+            timeout: 10000
+        });
+        
+        const translated = res.data?.responseData?.translatedText;
+        
+        if (!translated || res.data.responseStatus !== 200) {
+            throw new Error('Translation failed');
+        }
+        
+        const translationText = `🌍 *Translation*\n\n` +
+            `📝 *Original (en):*\n${text}\n\n` +
+            `✅ *Translated (${targetLang.toUpperCase()}):*\n${translated}\n\n` +
+            `> ${config.BOT_FOOTER}`;
+        
+        await socket.sendMessage(sender, {
+            text: translationText,
+            quoted: msg
+        });
+        
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+        
+    } catch (error) {
+        console.error('Translate error:', error);
+        await socket.sendMessage(sender, {
+            text: `❌ Translation failed! Check the language code and try again.\n\n*Common Codes:*\n• fr - French\n• es - Spanish\n• de - German\n• ar - Arabic\n• sw - Swahili\n• zh - Chinese\n• ja - Japanese\n• pt - Portuguese\n• hi - Hindi\n• ru - Russian\n\n*Usage:* \`.translate fr Hello world\``,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
                 // Case: alive
                 case 'uptime':
                 case 'alive': {
@@ -1242,179 +1733,322 @@ case 'publicmode': {
                 }
 
                 // Case: groupstatus
-                case 'groupstatus':
-                case 'togstatus':
-                case 'swgc':
-                case 'gs':
-                case 'gstatus': {
-                    try {
-                        if (!isGroup) {
-                            await socket.sendMessage(sender, { 
-                                text: '👥 This command can only be used in groups.' 
-                            }, { quoted: msg });
-                            break;
-                        }
+         // Case: groupstatus / ginfo / groupinfo / grpinfo / gstatus - Show group info
+case 'groupstatus':
+case 'ginfo':
+case 'groupinfo':
+case 'grpinfo':
+case 'gstatus': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, {
+                text: '❌ *Group Only Command*\n\nThis command can only be used in groups.',
+                buttons: [
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
 
-                        if (!isSenderGroupAdmin) {
-                            await socket.sendMessage(sender, { 
-                                text: '🔒 This command is for admins only.' 
-                            }, { quoted: msg });
-                            break;
-                        }
+        await socket.sendMessage(sender, { react: { text: '📊', key: msg.key } });
 
-                        const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
-                        const isBotAdmin = await isGroupAdmin(from, botJid);
-                        if (!isBotAdmin) {
-                            await socket.sendMessage(sender, { 
-                                text: '🤖 Bot needs to be admin to post group status.' 
-                            }, { quoted: msg });
-                            break;
-                        }
+        let meta;
+        try {
+            meta = await socket.groupMetadata(from);
+        } catch {
+            await socket.sendMessage(sender, {
+                text: '❌ Could not fetch group information.',
+                quoted: msg
+            });
+            await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+            break;
+        }
 
-                        const caption = args.join(' ').trim();
-                        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-                        const hasQuoted = !!quotedMsg;
+        const participants = meta.participants || [];
+        const admins = participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin');
+        const superAdmins = participants.filter(p => p.admin === 'superadmin');
+        const members = participants.filter(p => !p.admin);
 
-                        if (!hasQuoted) {
-                            if (!caption) {
-                                await socket.sendMessage(sender, { 
-                                    text: '📝 *Group Status Usage*\n\n' +
-                                          '• Reply to image/video/audio with:\n' +
-                                          '  `.groupstatus [optional caption]`\n' +
-                                          '• Or send text status only:\n' +
-                                          '  `.groupstatus Your text here`\n\n' +
-                                          'Text statuses use a single purple background color by default.',
-                                    quoted: msg
-                                });
-                                break;
-                            }
+        const createdAt = meta.creation
+            ? new Date(meta.creation * 1000).toLocaleString('en-US', {
+                day: 'numeric', month: 'long', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+                timeZone: 'Africa/Nairobi'
+              })
+            : 'Unknown';
 
-                            await socket.sendMessage(sender, { 
-                                text: '⏳ Posting text group status...' 
-                            }, { quoted: msg });
+        const ownerNum = meta.owner 
+            ? meta.owner.split('@')[0] 
+            : superAdmins[0]?.id.split('@')[0] || 'Unknown';
 
-                            try {
-                                await groupStatus(socket, from, {
-                                    text: caption,
-                                    backgroundColor: '#9C27B0',
-                                });
-                                await socket.sendMessage(sender, { 
-                                    text: '✅ Text group status posted!' 
-                                }, { quoted: msg });
-                            } catch (e) {
-                                console.error('groupstatus text error:', e);
-                                await socket.sendMessage(sender, { 
-                                    text: '❌ Failed to post text group status: ' + (e.message || e) 
-                                }, { quoted: msg });
-                            }
-                            break;
-                        }
+        let inviteLink = '';
+        try {
+            const code = await socket.groupInviteCode(from);
+            inviteLink = `https://chat.whatsapp.com/${code}`;
+        } catch { 
+            inviteLink = 'Not available (Admin only)';
+        }
 
-                        const mtype = Object.keys(quotedMsg)[0] || '';
-                        
-                        const downloadBuf = async () => {
-                            if (/image/i.test(mtype)) return await downloadMedia(quotedMsg, 'image');
-                            if (/video/i.test(mtype)) return await downloadMedia(quotedMsg, 'video');
-                            if (/audio/i.test(mtype)) return await downloadMedia(quotedMsg, 'audio');
-                            if (/sticker/i.test(mtype)) return await downloadMedia(quotedMsg, 'sticker');
-                            return null;
-                        };
+        const desc = meta.desc
+            ? `\n📄 *Description:*\n${meta.desc.trim().substring(0, 200)}${meta.desc.trim().length > 200 ? '...' : ''}`
+            : '';
 
-                        if (/image|sticker/i.test(mtype)) {
-                            await socket.sendMessage(sender, { text: '⏳ Posting image group status...' }, { quoted: msg });
-                            let buf;
-                            try {
-                                buf = await downloadBuf();
-                            } catch {
-                                await socket.sendMessage(sender, { text: '❌ Failed to download image' }, { quoted: msg });
-                                break;
-                            }
-                            if (!buf) {
-                                await socket.sendMessage(sender, { text: '❌ Could not download image' }, { quoted: msg });
-                                break;
-                            }
-                            try {
-                                await groupStatus(socket, from, { image: buf, caption: caption || '' });
-                                await socket.sendMessage(sender, { text: '✅ Image group status posted!' }, { quoted: msg });
-                            } catch (e) {
-                                console.error('groupstatus image error:', e);
-                                await socket.sendMessage(sender, { text: '❌ Failed to post image group status: ' + (e.message || e) }, { quoted: msg });
-                            }
-                            break;
-                        }
+        const announce = meta.announce ? '🔒 Admins only' : '🌐 All members';
+        const restrict = meta.restrict ? '🔒 Admins only' : '🌐 All members';
+        const ephemeral = meta.ephemeral
+            ? `${meta.ephemeral / 86400} days`
+            : '❌ Off';
 
-                        if (/video/i.test(mtype)) {
-                            await socket.sendMessage(sender, { text: '⏳ Posting video group status...' }, { quoted: msg });
-                            let buf;
-                            try {
-                                buf = await downloadBuf();
-                            } catch {
-                                await socket.sendMessage(sender, { text: '❌ Failed to download video' }, { quoted: msg });
-                                break;
-                            }
-                            if (!buf) {
-                                await socket.sendMessage(sender, { text: '❌ Could not download video' }, { quoted: msg });
-                                break;
-                            }
-                            try {
-                                await groupStatus(socket, from, { video: buf, caption: caption || '' });
-                                await socket.sendMessage(sender, { text: '✅ Video group status posted!' }, { quoted: msg });
-                            } catch (e) {
-                                console.error('groupstatus video error:', e);
-                                await socket.sendMessage(sender, { text: '❌ Failed to post video group status: ' + (e.message || e) }, { quoted: msg });
-                            }
-                            break;
-                        }
+        const infoText =
+            `╔══════════════════╗\n` +
+            `  📊 *GROUP INFORMATION*\n` +
+            `╚══════════════════╝\n\n` +
+            `🏷️ *Name:* ${meta.subject || 'N/A'}\n` +
+            `🆔 *ID:* \`${from.split('@')[0]}\`\n` +
+            `👑 *Owner:* @${ownerNum}\n` +
+            `📅 *Created:* ${createdAt}\n` +
+            `${desc}\n` +
+            `\n👥 *Members:* ${participants.length}\n` +
+            `   ├ 👑 Super Admins: ${superAdmins.length}\n` +
+            `   ├ 🛡️ Admins: ${admins.length}\n` +
+            `   └ 👤 Members: ${members.length}\n` +
+            `\n⚙️ *Settings:*\n` +
+            `   ├ 💬 Messages: ${announce}\n` +
+            `   ├ ✏️ Edit Info: ${restrict}\n` +
+            `   └ ⏳ Disappearing: ${ephemeral}\n` +
+            `\n🔗 *Invite:* ${inviteLink}\n\n` +
+            `> ${config.BOT_FOOTER}`;
 
-                        if (/audio/i.test(mtype)) {
-                            await socket.sendMessage(sender, { text: '⏳ Posting audio group status...' }, { quoted: msg });
-                            let buf;
-                            try {
-                                buf = await downloadBuf();
-                            } catch {
-                                await socket.sendMessage(sender, { text: '❌ Failed to download audio' }, { quoted: msg });
-                                break;
-                            }
-                            if (!buf) {
-                                await socket.sendMessage(sender, { text: '❌ Could not download audio' }, { quoted: msg });
-                                break;
-                            }
-                            let vn;
-                            try {
-                                vn = await toVN(buf);
-                            } catch {
-                                vn = buf;
-                            }
-                            let waveform;
-                            try {
-                                waveform = await generateWaveform(buf);
-                            } catch {
-                                waveform = undefined;
-                            }
-                            try {
-                                await groupStatus(socket, from, {
-                                    audio: vn,
-                                    mimetype: 'audio/ogg; codecs=opus',
-                                    ptt: true,
-                                    waveform: waveform,
-                                });
-                                await socket.sendMessage(sender, { text: '✅ Audio group status posted!' }, { quoted: msg });
-                            } catch (e) {
-                                console.error('groupstatus audio error:', e);
-                                await socket.sendMessage(sender, { text: '❌ Failed to post audio group status: ' + (e.message || e) }, { quoted: msg });
-                            }
-                            break;
-                        }
+        const mentions = [meta.owner, ...superAdmins.map(p => p.id)].filter(Boolean);
 
-                        await socket.sendMessage(sender, { text: '❌ Unsupported media type. Reply to an image, video, or audio.' }, { quoted: msg });
-                        
-                    } catch (e) {
-                        console.error('groupstatus command error:', e);
-                        await socket.sendMessage(sender, { text: '❌ Error: ' + (e.message || e) }, { quoted: msg });
-                    }
-                    break;
-                }
+        // Build buttons
+        const buttons = [];
+        
+        if (inviteLink && inviteLink.startsWith('https://')) {
+            buttons.push({
+                buttonId: inviteLink,
+                buttonText: { displayText: '🔗 INVITE LINK' },
+                type: 1
+            });
+        }
+        
+        buttons.push({
+            buttonId: `${prefix}tagall`,
+            buttonText: { displayText: '👥 TAG ALL' },
+            type: 1
+        });
+        
+        buttons.push({
+            buttonId: `${prefix}tagadmins`,
+            buttonText: { displayText: '🛡️ TAG ADMINS' },
+            type: 1
+        });
 
+        // Try to send with group icon
+        try {
+            const pp = await socket.profilePictureUrl(from, 'image');
+            await socket.sendMessage(sender, {
+                image: { url: pp },
+                caption: infoText,
+                mentions: mentions,
+                buttons: buttons,
+                headerType: 1
+            }, { quoted: msg });
+        } catch {
+            // Send without group icon
+            await socket.sendMessage(sender, {
+                text: infoText,
+                mentions: mentions,
+                buttons: buttons,
+                headerType: 1
+            }, { quoted: msg });
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('GroupStatus error:', error);
+        await socket.sendMessage(sender, {
+            text: `❌ *Error fetching group info*\n\n${error.message}`,
+            buttons: [
+                { buttonId: `${prefix}gstatus`, buttonText: { displayText: '🔄 RETRY' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+// Case: tourl / imgtourl / imgurl / geturl / upload - Upload media to Catbox
+case 'tourl':
+case 'imgtourl':
+case 'imgurl':
+case 'geturl':
+case 'upload': {
+    try {
+        const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        
+        // Prefer quoted message, fall back to direct message
+        const source = quoted || msg.message;
+        
+        if (!source) {
+            await socket.sendMessage(sender, {
+                text: '❌ *Upload to URL*\n\nReply to an image, video, audio, or document to upload it.\n\n*Usage:* Reply to media with `.tourl`',
+                buttons: [
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        // Determine media type
+        let mediaContent = null;
+        let mediaType = '';
+        let mimeType = '';
+
+        if (source.imageMessage) {
+            mediaContent = source.imageMessage;
+            mediaType = 'image';
+            mimeType = mediaContent.mimetype || 'image/jpeg';
+        } else if (source.videoMessage) {
+            mediaContent = source.videoMessage;
+            mediaType = 'video';
+            mimeType = mediaContent.mimetype || 'video/mp4';
+        } else if (source.audioMessage) {
+            mediaContent = source.audioMessage;
+            mediaType = 'audio';
+            mimeType = mediaContent.mimetype || 'audio/mpeg';
+        } else if (source.documentMessage) {
+            mediaContent = source.documentMessage;
+            mediaType = 'document';
+            mimeType = mediaContent.mimetype || 'application/octet-stream';
+        } else if (source.stickerMessage) {
+            mediaContent = source.stickerMessage;
+            mediaType = 'sticker';
+            mimeType = 'image/webp';
+        } else {
+            await socket.sendMessage(sender, {
+                text: '❌ *Unsupported Media*\n\nPlease reply to an image, video, audio, or document.',
+                buttons: [
+                    { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
+
+        // Send processing reaction
+        await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
+
+        // Send uploading message
+        const uploadingMsg = await socket.sendMessage(sender, {
+            text: '⏳ *Uploading to Catbox...*\n\nPlease wait...',
+            quoted: msg
+        });
+
+        let tempPath = null;
+        
+        // Download media
+        const stream = await downloadContentFromMessage(mediaContent, mediaType);
+        let buffer = Buffer.alloc(0);
+        for await (const chunk of stream) {
+            buffer = Buffer.concat([buffer, chunk]);
+        }
+
+        // Determine file extension
+        let ext = '';
+        if (mimeType.includes('image/jpeg') || mimeType.includes('image/jpg')) ext = '.jpg';
+        else if (mimeType.includes('image/png')) ext = '.png';
+        else if (mimeType.includes('image/webp')) ext = '.webp';
+        else if (mimeType.includes('video/mp4')) ext = '.mp4';
+        else if (mimeType.includes('video')) ext = '.mp4';
+        else if (mimeType.includes('audio/mpeg') || mimeType.includes('audio/mp3')) ext = '.mp3';
+        else if (mimeType.includes('audio/ogg')) ext = '.ogg';
+        else if (mimeType.includes('audio')) ext = '.mp3';
+        else if (mimeType.includes('pdf')) ext = '.pdf';
+        else ext = '.bin';
+
+        // Save temp file
+        tempPath = path.join(TEMP_MEDIA_DIR, `catbox_${Date.now()}${ext}`);
+        await writeFile(tempPath, buffer);
+
+        // Upload to Catbox
+        const form = new FormData();
+        form.append('fileToUpload', fs.createReadStream(tempPath), `file${ext}`);
+        form.append('reqtype', 'fileupload');
+
+        const { data: mediaUrl } = await axios.post('https://catbox.moe/user/api.php', form, {
+            headers: form.getHeaders(),
+            timeout: 30000
+        });
+
+        // Delete uploading message
+        try { await socket.sendMessage(sender, { delete: uploadingMsg.key }); } catch {}
+
+        if (!mediaUrl || mediaUrl.toLowerCase().includes('error')) {
+            throw new Error('Catbox returned an error: ' + mediaUrl);
+        }
+
+        // Format size
+        const sizeStr = buffer.length < 1048576
+            ? `${(buffer.length / 1024).toFixed(1)} KB`
+            : `${(buffer.length / 1048576).toFixed(2)} MB`;
+
+        // Determine media label
+        const label = mimeType.includes('image') ? '🖼️ Image'
+            : mimeType.includes('video') ? '🎬 Video'
+            : mimeType.includes('audio') ? '🎵 Audio'
+            : mimeType.includes('pdf') ? '📄 Document'
+            : '📁 File';
+
+        // Send result with buttons
+        await socket.sendMessage(sender, {
+            text: `☁️ *Upload Complete!*\n\n` +
+                  `${label}\n` +
+                  `📦 *Size:* ${sizeStr}\n` +
+                  `🔗 *URL:* ${mediaUrl}\n\n` +
+                  `> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: mediaUrl, buttonText: { displayText: '🔗 OPEN URL' }, type: 1 },
+                { buttonId: `${prefix}tourl`, buttonText: { displayText: '📤 UPLOAD MORE' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+        // Clean up temp file
+        if (tempPath && fs.existsSync(tempPath)) {
+            try { fs.unlinkSync(tempPath); } catch {}
+        }
+
+    } catch (err) {
+        console.error('[Upload] Error:', err.message);
+        
+        try {
+            // Delete uploading message if it exists
+            // The uploadingMsg might not be in scope here, so we skip deletion
+        } catch {}
+        
+        await socket.sendMessage(sender, {
+            text: `⚠️ *Upload Failed*\n\n${err.message}\n\nMake sure you're replying to a valid media file.`,
+            buttons: [
+                { buttonId: `${prefix}tourl`, buttonText: { displayText: '🔄 RETRY' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 MENU' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        
+        // Clean up temp file on error
+        // tempPath cleanup is handled if it exists
+    }
+    break;
+}
 ///xoding case 
 // Case: color
 case 'color': {
