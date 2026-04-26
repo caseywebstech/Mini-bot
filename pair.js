@@ -40,7 +40,6 @@ const {
 
 const config = {
     selfMode: false,
-    anticall: false,
     antidelete: true,
     AUTO_VIEW_STATUS: 'true',
     AUTO_LIKE_STATUS: 'true',
@@ -67,6 +66,33 @@ global.autoReadPM = false;
 // Welcome/Goodbye group settings
 const groupWelcomeSettings = new Map();
 global.welcomeSettings = groupWelcomeSettings;
+// ============ ANTI-CALL SETTINGS ============
+const ANTICALL_SETTINGS_PATH = './anti-call-settings.json';
+
+const DEFAULT_ANTICALL_SETTINGS = {
+    rejectCalls: true,
+    blockCaller: false,
+    notifyAdmin: true,
+    autoReply: "🚫 I don't accept calls. Please send a text message instead.",
+    blockedUsers: []
+};
+
+function loadAnticallSettings() {
+    try {
+        if (fs.existsSync(ANTICALL_SETTINGS_PATH)) {
+            return JSON.parse(fs.readFileSync(ANTICALL_SETTINGS_PATH, 'utf8'));
+        }
+    } catch {}
+    return { ...DEFAULT_ANTICALL_SETTINGS };
+}
+
+function saveAnticallSettings(s) {
+    try {
+        fs.writeFileSync(ANTICALL_SETTINGS_PATH, JSON.stringify(s, null, 2));
+    } catch {}
+}
+
+const anticallSettings = loadAnticallSettings();
 // Antidelete configuration
 const messageStore = new Map();
 const CONFIG_PATH = './antidelete.json';
@@ -670,6 +696,47 @@ function setupNewsletterHandlers(socket) {
             console.error('⚠️ Newsletter reaction handler failed:', error.message);
         }
     });
+}
+// ============ ANTI-CALL HANDLER ============
+function initAntiCallHandler(sock) {
+    const ownerJid = config.OWNER_NUMBER + '@s.whatsapp.net';
+    
+    sock.ev.on('call', async (calls) => {
+        for (const call of calls) {
+            if (call.status !== 'offer') continue;
+            const caller = call.from;
+
+            if (anticallSettings.blockedUsers.includes(caller) || anticallSettings.rejectCalls) {
+                try {
+                    await sock.rejectCall(call.id, caller);
+                    console.log(`📞 Call rejected from: ${caller}`);
+                } catch {}
+            }
+
+            if (anticallSettings.autoReply) {
+                try {
+                    await sock.sendMessage(caller, {
+                        text: anticallSettings.autoReply
+                    });
+                } catch {}
+            }
+
+            if (anticallSettings.notifyAdmin && ownerJid) {
+                try {
+                    await sock.sendMessage(ownerJid, {
+                        text: `📞 *Anti-Call Alert*\n\nCaller: ${caller}\nType: ${call.isVideo ? 'video' : 'voice'}\nStatus: Rejected`
+                    });
+                } catch {}
+            }
+
+            if (anticallSettings.blockCaller && !anticallSettings.blockedUsers.includes(caller)) {
+                anticallSettings.blockedUsers.push(caller);
+                saveAnticallSettings(anticallSettings);
+                console.log(`🚫 Auto-blocked caller: ${caller}`);
+            }
+        }
+    });
+    console.log('🛡️ Anti-Call handler registered.');
 }
 // Welcome/Goodbye Handler
 function setupWelcomeGoodbyeHandlers(sock) {
@@ -1331,54 +1398,139 @@ case 'publicmode': {
                 }
 
                 // Case: anticall
-                case 'anticall': {
-                    try {
-                        if (!isOwner) {
-                            await socket.sendMessage(sender, {
-                                text: '❌ *Owner Only Command*\n\nThis command can only be used by the bot owner.',
-                                quoted: msg
-                            });
-                            break;
-                        }
+              // Case: anticall - Manage anti-call protection
+case 'anticall': {
+    try {
+        if (!isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴏᴡɴᴇʀ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
+        }
 
-                        if (!args[0]) {
-                            const status = config.anticall ? '✅ ENABLED' : '❌ DISABLED';
-                            await socket.sendMessage(sender, {
-                                text: `📞 *Anti-Call System*\n\n┏━━━━━━━━━━━━━━━━━━┓\n┃ 📌 Status: *${status}*\n┗━━━━━━━━━━━━━━━━━━┛\n\n*Usage:*\n${prefix}anticall on - Enable anti-call\n${prefix}anticall off - Disable anti-call\n\nWhen enabled, calls will be auto-rejected & blocked.\n\n> *CaseyRhodes Bot*`,
-                                quoted: msg
-                            });
-                            break;
-                        }
+        const action = args[0]?.toLowerCase();
 
-                        const option = args[0].toLowerCase();
+        if (!action) {
+            await socket.sendMessage(sender, {
+                text: `🛡️ *ᴀɴᴛɪ-ᴄᴀʟʟ sᴛᴀᴛᴜs*\n\n` +
+                      `• ᴘʀᴏᴛᴇᴄᴛɪᴏɴ: ${anticallSettings.rejectCalls ? '✅ ᴇɴᴀʙʟᴇᴅ' : '❌ ᴅɪsᴀʙʟᴇᴅ'}\n` +
+                      `• ʙʟᴏᴄᴋ ᴏɴ ᴄᴀʟʟ: ${anticallSettings.blockCaller ? '✅ ᴏɴ' : '❌ ᴏғғ'}\n` +
+                      `• ᴀᴜᴛᴏ-ʀᴇᴘʟʏ: ${anticallSettings.autoReply ? '✅ ᴏɴ' : '❌ ᴏғғ'}\n` +
+                      `• ʙʟᴏᴄᴋᴇᴅ ᴜsᴇʀs: ${anticallSettings.blockedUsers.length}\n\n` +
+                      `*ᴜsᴀɢᴇ:*\n` +
+                      `• \`${prefix}anticall on\`\n` +
+                      `• \`${prefix}anticall off\`\n` +
+                      `• \`${prefix}anticall block <num>\`\n` +
+                      `• \`${prefix}anticall unblock <num>\`\n` +
+                      `• \`${prefix}anticall blocklist\`\n\n` +
+                      `> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}anticall on`, buttonText: { displayText: '✅ ᴇɴᴀʙʟᴇ' }, type: 1 },
+                    { buttonId: `${prefix}anticall off`, buttonText: { displayText: '❌ ᴅɪsᴀʙʟᴇ' }, type: 1 },
+                    { buttonId: `${prefix}anticall blocklist`, buttonText: { displayText: '📋 ʙʟᴏᴄᴋʟɪsᴛ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+            break;
+        }
 
-                        if (!['on', 'off'].includes(option)) {
-                            await socket.sendMessage(sender, {
-                                text: '❌ *Invalid Option*\n\nUsage: .anticall on/off\n\n> *CaseyRhodes Bot*',
-                                quoted: msg
-                            });
-                            break;
-                        }
+        switch (action) {
+            case 'on':
+                anticallSettings.rejectCalls = true;
+                saveAnticallSettings(anticallSettings);
+                await socket.sendMessage(sender, {
+                    text: `✅ *ᴀɴᴛɪ-ᴄᴀʟʟ ᴇɴᴀʙʟᴇᴅ*\n\nᴀʟʟ ɪɴᴄᴏᴍɪɴɢ ᴄᴀʟʟs ᴡɪʟʟ ʙᴇ ʀᴇᴊᴇᴄᴛᴇᴅ.\n\n> ${config.BOT_FOOTER}`,
+                    quoted: msg
+                });
+                break;
 
-                        const enabled = option === 'on';
-                        config.anticall = enabled;
+            case 'off':
+                anticallSettings.rejectCalls = false;
+                saveAnticallSettings(anticallSettings);
+                await socket.sendMessage(sender, {
+                    text: `❌ *ᴀɴᴛɪ-ᴄᴀʟʟ ᴅɪsᴀʙʟᴇᴅ*\n\nɪɴᴄᴏᴍɪɴɢ ᴄᴀʟʟs ᴡɪʟʟ ɴᴏᴛ ʙᴇ ʀᴇᴊᴇᴄᴛᴇᴅ.\n\n> ${config.BOT_FOOTER}`,
+                    quoted: msg
+                });
+                break;
 
-                        await socket.sendMessage(sender, {
-                            text: enabled 
-                                ? '✅ *Anti-Call ENABLED*\n\nCalls will be auto-rejected & blocked.\n\n> *CaseyRhodes Bot*'
-                                : '❌ *Anti-Call DISABLED*\n\nCalls will not be blocked.\n\n> *CaseyRhodes Bot*',
-                            quoted: msg
-                        });
-
-                    } catch (error) {
-                        console.error('Anticall command error:', error);
-                        await socket.sendMessage(sender, {
-                            text: '❌ Error updating anti-call setting: ' + error.message,
-                            quoted: msg
-                        });
-                    }
+            case 'block': {
+                const num = (args[1] || '').replace(/\D/g, '') + '@s.whatsapp.net';
+                if (!args[1]) {
+                    await socket.sendMessage(sender, {
+                        text: `❌ *ᴜsᴀɢᴇ:* \`${prefix}anticall block <number>\`\n\n*ᴇxᴀᴍᴘʟᴇ:* \`${prefix}anticall block 254712345678\``,
+                        quoted: msg
+                    });
                     break;
                 }
+                if (anticallSettings.blockedUsers.includes(num)) {
+                    await socket.sendMessage(sender, {
+                        text: `ℹ️ *ᴀʟʀᴇᴀᴅʏ ʙʟᴏᴄᴋᴇᴅ*\n\n${args[1]} ɪs ᴀʟʀᴇᴀᴅʏ ɪɴ ᴛʜᴇ ʙʟᴏᴄᴋ ʟɪsᴛ.`,
+                        quoted: msg
+                    });
+                    break;
+                }
+                anticallSettings.blockedUsers.push(num);
+                saveAnticallSettings(anticallSettings);
+                await socket.sendMessage(sender, {
+                    text: `✅ *${args[1]}* ʙʟᴏᴄᴋᴇᴅ ғʀᴏᴍ ᴄᴀʟʟɪɴɢ.\n\n> ${config.BOT_FOOTER}`,
+                    quoted: msg
+                });
+                break;
+            }
+
+            case 'unblock': {
+                const num = (args[1] || '').replace(/\D/g, '') + '@s.whatsapp.net';
+                if (!args[1]) {
+                    await socket.sendMessage(sender, {
+                        text: `❌ *ᴜsᴀɢᴇ:* \`${prefix}anticall unblock <number>\``,
+                        quoted: msg
+                    });
+                    break;
+                }
+                anticallSettings.blockedUsers = anticallSettings.blockedUsers.filter(u => u !== num);
+                saveAnticallSettings(anticallSettings);
+                await socket.sendMessage(sender, {
+                    text: `✅ *${args[1]}* ᴜɴʙʟᴏᴄᴋᴇᴅ.\n\n> ${config.BOT_FOOTER}`,
+                    quoted: msg
+                });
+                break;
+            }
+
+            case 'blocklist':
+            case 'list': {
+                if (anticallSettings.blockedUsers.length === 0) {
+                    await socket.sendMessage(sender, {
+                        text: `📋 *ʙʟᴏᴄᴋᴇᴅ ᴄᴀʟʟᴇʀs*\n\nɴᴏ ʙʟᴏᴄᴋᴇᴅ ᴄᴀʟʟᴇʀs.\n\n> ${config.BOT_FOOTER}`,
+                        quoted: msg
+                    });
+                    break;
+                }
+                const list = anticallSettings.blockedUsers
+                    .map((jid, i) => `${i + 1}. ${jid.split('@')[0]}`)
+                    .join('\n');
+                await socket.sendMessage(sender, {
+                    text: `📋 *ʙʟᴏᴄᴋᴇᴅ ᴄᴀʟʟᴇʀs*\n\n${list}\n\nᴛᴏᴛᴀʟ: ${anticallSettings.blockedUsers.length}\n\n> ${config.BOT_FOOTER}`,
+                    quoted: msg
+                });
+                break;
+            }
+
+            default:
+                await socket.sendMessage(sender, {
+                    text: `❌ *ᴜɴᴋɴᴏᴡɴ ᴏᴘᴛɪᴏɴ*\n\nᴜsᴇ: \`${prefix}anticall on/off/block/unblock/blocklist\``,
+                    quoted: msg
+                });
+        }
+    } catch (error) {
+        console.error('AntiCall error:', error);
+        await socket.sendMessage(sender, {
+            text: '❌ *ᴇʀʀᴏʀ ᴍᴀɴᴀɢɪɴɢ ᴀɴᴛɪ-ᴄᴀʟʟ sᴇᴛᴛɪɴɢs*',
+            quoted: msg
+        });
+    }
+    break;
+}
                 // case country 
                 // Case: country / countryinfo - Get detailed information about any country
 case 'country':
@@ -11653,14 +11805,14 @@ case 'climate': {
       //case repository 
 // Case: repo - Show repository information
 // Case: github - Show GitHub repository info
-case 'github':
+// Case: repo / github / git / source / sc / script - Show repository info
 case 'repo':
+case 'github':
 case 'git':
 case 'source':
 case 'sc':
 case 'script': {
     try {
-        // Send reaction
         await socket.sendMessage(sender, { react: { text: '📦', key: msg.key } });
         
         const repoUrl = 'https://github.com/mruniquehacker/KnightBot-Mini';
@@ -11669,7 +11821,6 @@ case 'script': {
         let message = '';
         
         try {
-            // Fetch repository data from GitHub API
             const response = await axios.get(apiUrl, {
                 headers: { 'User-Agent': 'KnightBot-Mini' },
                 timeout: 5000
@@ -11677,58 +11828,49 @@ case 'script': {
             
             const repo = response.data;
             
-            // Format message with stats
-            message = `╭━━『 *📦 GITHUB REPO* 』━━╮\n\n` +
-                      `🤖 *Bot:* ${config.OWNER_NAME}\n` +
-                      `📁 *Repo:* ${repo.name}\n` +
-                      `👤 *Owner:* ${repo.owner.login}\n` +
-                      `⭐ *Stars:* ${repo.stargazers_count.toLocaleString()}\n` +
-                      `🍴 *Forks:* ${repo.forks_count.toLocaleString()}\n` +
-                      `📝 *Desc:* ${repo.description || 'WhatsApp Bot'}\n\n` +
-                      `🔗 *Link:* ${repo.html_url}\n\n` +
+            message = `╭━━『 *📦 ɢɪᴛʜᴜʙ ʀᴇᴘᴏ* 』━━╮\n\n` +
+                      `🤖 *ʙᴏᴛ:* ${config.OWNER_NAME}\n` +
+                      `📁 *ʀᴇᴘᴏ:* ${repo.name}\n` +
+                      `👤 *ᴏᴡɴᴇʀ:* ${repo.owner.login}\n` +
+                      `⭐ *sᴛᴀʀs:* ${repo.stargazers_count.toLocaleString()}\n` +
+                      `🍴 *ғᴏʀᴋs:* ${repo.forks_count.toLocaleString()}\n` +
+                      `📝 *ᴅᴇsᴄ:* ${repo.description || 'WhatsApp Bot'}\n\n` +
+                      `🔗 *ʟɪɴᴋ:* ${repo.html_url}\n\n` +
                       `╰━━━━━━━━━━━━━━━╯\n\n` +
-                      `> *${config.BOT_FOOTER}*`;
+                      `> ${config.BOT_FOOTER}`;
             
         } catch (apiError) {
-            // Fallback message if API fails
-            message = `╭━━『 *📦 GITHUB REPO* 』━━╮\n\n` +
-                      `🤖 *Bot:* ${config.OWNER_NAME}\n` +
-                      `📁 *Repo:* KnightBot-Mini\n` +
-                      `👤 *Owner:* mruniquehacker\n` +
-                      `🔗 *URL:* ${repoUrl}\n\n` +
-                      `⚠️ *Stats unavailable*\n` +
-                      `Visit repo for latest stats\n\n` +
+            message = `╭━━『 *📦 ɢɪᴛʜᴜʙ ʀᴇᴘᴏ* 』━━╮\n\n` +
+                      `🤖 *ʙᴏᴛ:* ${config.OWNER_NAME}\n` +
+                      `📁 *ʀᴇᴘᴏ:* KnightBot-Mini\n` +
+                      `👤 *ᴏᴡɴᴇʀ:* mruniquehacker\n` +
+                      `🔗 *ᴜʀʟ:* ${repoUrl}\n\n` +
+                      `⚠️ *sᴛᴀᴛs ᴜɴᴀᴠᴀɪʟᴀʙʟᴇ*\n\n` +
                       `╰━━━━━━━━━━━━━━━╯\n\n` +
-                      `> *${config.BOT_FOOTER}*`;
+                      `> ${config.BOT_FOOTER}`;
         }
         
-        // Send message with buttons
+        // CTA URL Button Format
         await socket.sendMessage(sender, {
             text: message,
-            buttons: [
-                {
-                    name: 'cta_url',
-                    buttonParamsJson: JSON.stringify({
-                        display_text: '⭐ STAR REPO',
-                        url: `${repoUrl}/stargazers`
-                    })
-                },
-                {
-                    name: 'cta_url',
-                    buttonParamsJson: JSON.stringify({
-                        display_text: '🔗 VISIT REPO',
-                        url: repoUrl
-                    })
-                }
-            ]
+            footer: 'ᴄʟɪᴄᴋ ʙᴇʟᴏᴡ ᴛᴏ ᴠɪsɪᴛ',
+            templateButtons: [
+                { index: 1, urlButton: { displayText: '⭐ sᴛᴀʀ ʀᴇᴘᴏ', url: repoUrl } },
+                { index: 2, urlButton: { displayText: '🔗 ᴠɪᴇᴡ ʀᴇᴘᴏ', url: repoUrl } },
+                { index: 3, quickReplyButton: { displayText: '📋 ᴍᴇɴᴜ', id: `${prefix}menu` } }
+            ],
+            headerType: 1
         }, { quoted: msg });
+        
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
         
     } catch (error) {
         console.error('GitHub command error:', error);
         await socket.sendMessage(sender, {
-            text: '❌ Failed to fetch repository info.',
+            text: '❌ ғᴀɪʟᴇᴅ ᴛᴏ ғᴇᴛᴄʜ ʀᴇᴘᴏ ɪɴғᴏ.',
             quoted: msg
         });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
 }
@@ -11984,6 +12126,7 @@ async function EmpirePair(number, res) {
         setupStatusHandlers(socket);
         setupCommandHandlers(socket, sanitizedNumber);
 		setupWelcomeGoodbyeHandlers(socket);
+		initAntiCallHandler(socket);
         setupMessageHandlers(socket);
         setupAutoRestart(socket, sanitizedNumber);
         setupNewsletterHandlers(socket);
