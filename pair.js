@@ -892,68 +892,65 @@ function setupCommandHandlers(socket, number) {
         }
         
         try {
-			 switch (command) {
-
+               switch (command) {
                 // ============ ANTIDELETE COMMAND ============
-                case 'antidelete':
-                case 'antidel': {
-                    if (!isOwner) {
-                        await socket.sendMessage(sender, {
-                            text: '❌ *Only bot owner can use this command!* 🔒',
-                            quoted: msg
-                        });
-                        break;
-                    }
-                    
-                    const action = (args[0] || '').toLowerCase();
-                    let currentConfig = { enabled: true };
-                    
-                    try {
-                        if (fs.existsSync(CONFIG_PATH)) {
-                            currentConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-                        }
-                    } catch (err) {
-                        console.error('Config load error:', err);
-                    }
-                    
-                    if (action === 'on') {
-                        currentConfig.enabled = true;
-                        if (saveAntideleteConfig(currentConfig)) {
-                            await socket.sendMessage(sender, {
-                                text: '🛡️ *Anti-Delete is ON*\n\nDeleted and edited messages will be recovered and forwarded to owner.',
-                                quoted: msg
-                            });
-                        } else {
-                            await socket.sendMessage(sender, {
-                                text: '❌ Failed to enable anti-delete. Check file permissions.',
-                                quoted: msg
-                            });
-                        }
-                    } 
-                    else if (action === 'off') {
-                        currentConfig.enabled = false;
-                        if (saveAntideleteConfig(currentConfig)) {
-                            await socket.sendMessage(sender, {
-                                text: '🛡️ *Anti-Delete is OFF*\n\nDeleted messages will not be recovered.',
-                                quoted: msg
-                            });
-                        } else {
-                            await socket.sendMessage(sender, {
-                                text: '❌ Failed to disable anti-delete. Check file permissions.',
-                                quoted: msg
-                            });
-                        }
-                    } 
-                    else {
-                        const status = currentConfig.enabled ? '✅ ON' : '❌ OFF';
-                        await socket.sendMessage(sender, {
-                            text: `🛡️ *Anti-Delete Status*\n\n📌 Current Status: ${status}\n\n*Usage:*\n• \`${prefix}antidelete on\` — enable\n• \`${prefix}antidelete off\` — disable\n\n> ${config.BOT_FOOTER}`,
-                            quoted: msg
-                        });
-                    }
-                    break;
-                }
-               
+// Case: antidelete / antidel - Toggle anti-delete messages
+case 'antidelete':
+case 'antidel': {
+    try {
+        if (!isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴏᴡɴᴇʀ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
+        }
+
+        const action = (args[0] || '').toLowerCase();
+        const antideleteConfig = loadAntideleteConfig();
+
+        if (action === 'on') {
+            antideleteConfig.enabled = true;
+            saveAntideleteConfig(antideleteConfig);
+            await socket.sendMessage(sender, {
+                text: `🛡️ *ᴀɴᴛɪ-ᴅᴇʟᴇᴛᴇ ᴏɴ*\n\nᴅᴇʟᴇᴛᴇᴅ ᴍᴇssᴀɢᴇs ᴡɪʟʟ ʙᴇ ʀᴇᴄᴏᴠᴇʀᴇᴅ.\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}antidelete off`, buttonText: { displayText: '❌ ᴅɪsᴀʙʟᴇ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        } 
+        else if (action === 'off') {
+            antideleteConfig.enabled = false;
+            saveAntideleteConfig(antideleteConfig);
+            await socket.sendMessage(sender, {
+                text: `🛡️ *ᴀɴᴛɪ-ᴅᴇʟᴇᴛᴇ ᴏғғ*\n\nᴅᴇʟᴇᴛᴇᴅ ᴍᴇssᴀɢᴇs ᴡɪʟʟ ɴᴏᴛ ʙᴇ ʀᴇᴄᴏᴠᴇʀᴇᴅ.\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}antidelete on`, buttonText: { displayText: '✅ ᴇɴᴀʙʟᴇ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        } 
+        else {
+            const status = antideleteConfig.enabled ? '✅ ᴇɴᴀʙʟᴇᴅ' : '❌ ᴅɪsᴀʙʟᴇᴅ';
+            await socket.sendMessage(sender, {
+                text: `🛡️ *ᴀɴᴛɪ-ᴅᴇʟᴇᴛᴇ*\n\n📌 sᴛᴀᴛᴜs: ${status}\n\n*ᴜsᴀɢᴇ:*\n• \`${prefix}antidelete on\`\n• \`${prefix}antidelete off\`\n\n> ${config.BOT_FOOTER}`,
+                buttons: [
+                    { buttonId: `${prefix}antidelete on`, buttonText: { displayText: '✅ ᴇɴᴀʙʟᴇ' }, type: 1 },
+                    { buttonId: `${prefix}antidelete off`, buttonText: { displayText: '❌ ᴅɪsᴀʙʟᴇ' }, type: 1 }
+                ],
+                headerType: 1
+            }, { quoted: msg });
+        }
+    } catch (error) {
+        console.error('Antidelete error:', error);
+        await socket.sendMessage(sender, {
+            text: '❌ *ᴇʀʀᴏʀ*',
+            quoted: msg
+        });
+    }
+    break;
+}
             case 'autoread':
 case 'autoreadpm':
 case 'readall': {
