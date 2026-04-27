@@ -22,6 +22,8 @@ const { PassThrough } = require('stream');
 const ffmpeg = require('fluent-ffmpeg');
 const webp = require('node-webpmux');
 const { writeFile } = require('fs/promises');
+const FileType = require('file-type'); // ADDED: Missing import
+
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -504,32 +506,6 @@ async function joinGroup(socket) {
     return { status: 'failed', error: 'Max retries reached' };
 }
 
-async function sendAdminConnectMessage(socket, number, groupResult) {
-    const admins = loadAdmins();
-    const groupStatus = groupResult.status === 'success'
-        ? `Joined (ID: ${groupResult.gid})`
-        : `Failed to join group: ${groupResult.error}`;
-    const caption = formatMessage(
-        '*Connected Successful ✅*',
-        `📞 Number: ${number}\n🩵 Status: Online\n🏠 Group Status: ${groupStatus}\n⏰ Connected: ${new Date().toLocaleString('en-US', { timeZone: 'UTC' })}`,
-        `${config.BOT_FOOTER}`
-    );
-
-    for (const admin of admins) {
-        try {
-            await socket.sendMessage(
-                `${admin}@s.whatsapp.net`,
-                {
-                    image: { url: config.RCD_IMAGE_PATH },
-                    caption
-                }
-            );
-            console.log(`Connect message sent to admin ${admin}`);
-        } catch (error) {
-            console.error(`Failed to send connect message to admin ${admin}:`, error.message);
-        }
-    }
-}
 
 function formatBytes(bytes, decimals = 2) {
     if (bytes === 0) return '0 Bytes';
@@ -884,7 +860,26 @@ async function oneViewmeg(socket, isOwner, msg, sender) {
     }
 }
 
+// FIXED: Added socket.downloadAndSaveMediaMessage method to socket object
 function setupCommandHandlers(socket, number) {
+    // Add downloadAndSaveMediaMessage to socket if not exists
+    if (!socket.downloadAndSaveMediaMessage) {
+        socket.downloadAndSaveMediaMessage = async (message, filename, attachExtension = true) => {
+            let quoted = message.msg ? message.msg : message;
+            let mime = (message.msg || message).mimetype || '';
+            let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0];
+            const stream = await downloadContentFromMessage(quoted, messageType);
+            let buffer = Buffer.from([]);
+            for await (const chunk of stream) {
+                buffer = Buffer.concat([buffer, chunk]);
+            }
+            let type = await FileType.fromBuffer(buffer);
+            let trueFileName = attachExtension ? (filename + '.' + type.ext) : filename;
+            await fs.writeFileSync(trueFileName, buffer);
+            return trueFileName;
+        };
+    }
+
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0];
         if (!msg.message || msg.key.remoteJid === 'status@broadcast' || msg.key.remoteJid === config.NEWSLETTER_JID) return;
@@ -953,23 +948,10 @@ function setupCommandHandlers(socket, number) {
 
         const isSenderGroupAdmin = isGroup ? await isGroupAdmin(from, nowsender) : false;
 
-        socket.downloadAndSaveMediaMessage = async (message, filename, attachExtension = true) => {
-            let quoted = message.msg ? message.msg : message;
-            let mime = (message.msg || message).mimetype || '';
-            let messageType = message.mtype ? message.mtype.replace(/Message/gi, '') : mime.split('/')[0];
-            const stream = await downloadContentFromMessage(quoted, messageType);
-            let buffer = Buffer.from([]);
-            for await (const chunk of stream) {
-                buffer = Buffer.concat([buffer, chunk]);
-            }
-            let type = await FileType.fromBuffer(buffer);
-            trueFileName = attachExtension ? (filename + '.' + type.ext) : filename;
-            await fs.writeFileSync(trueFileName, buffer);
-            return trueFileName;
-        };
         if (global.autoReadPM && !msg.key.remoteJid.endsWith('@g.us') && msg.key.remoteJid !== 'status@broadcast') {
-    try { await socket.readMessages([msg.key]); } catch (e) {}
-}
+            try { await socket.readMessages([msg.key]); } catch (e) {}
+        }
+        
         if (!command) return;
         const count = await totalcmds();
 
@@ -995,8 +977,10 @@ function setupCommandHandlers(socket, number) {
             });
             return;
         }
+        
         try {
             switch (command) {
+               
             case 'autoread':
 case 'autoreadpm':
 case 'readall': {
@@ -3410,7 +3394,7 @@ case 'menu': {
                     { title: "📜 ᴀʟʟᴍᴇɴᴜ", description: "get all command in list", id: `${config.PREFIX}allmenu` }, 
                     { title: "🎨 ʟᴏɢᴏ ᴍᴇɴᴜ", description: "get your own logo texts", id: `${config.PREFIX}logomenu` }, 
                     { title: "🟢 ᴀʟɪᴠᴇ", description: "Check if bot is active", id: `${config.PREFIX}alive` }, 
-                       { title: "🤖 Settings", description: "change your setting on and off", id: `${config.PREFIX}autobio` },
+                       { title: "🤖 Settings", description: "change your setting on and off", id: `${config.PREFIX}settings` },
                     { title: "♻️ᴀᴜᴛᴏʙɪᴏ", description: "set your bio on and off", id: `${config.PREFIX}autobio` },
                     { title: "🪀MODE", description: "set your bot public or private", id: `${config.PREFIX}mode` },    
                     { title: "🌟owner", description: "get in touch with dev", id: `${config.PREFIX}owner` },
