@@ -22,7 +22,7 @@ const { PassThrough } = require('stream');
 const ffmpeg = require('fluent-ffmpeg');
 const webp = require('node-webpmux');
 const { writeFile } = require('fs/promises');
-const FileType = require('file-type'); // ADDED: Missing import
+const FileType = require('file-type');
 
 const {
     default: makeWASocket,
@@ -65,12 +65,10 @@ const config = {
 
 let autoReadEnabled = false;
 global.autoReadPM = false;
-// Welcome/Goodbye group settings
 const groupWelcomeSettings = new Map();
 global.welcomeSettings = groupWelcomeSettings;
-// ============ ANTI-CALL SETTINGS ============
-const ANTICALL_SETTINGS_PATH = './anti-call-settings.json';
 
+const ANTICALL_SETTINGS_PATH = './anti-call-settings.json';
 const DEFAULT_ANTICALL_SETTINGS = {
     rejectCalls: true,
     blockCaller: false,
@@ -95,17 +93,14 @@ function saveAnticallSettings(s) {
 }
 
 const anticallSettings = loadAnticallSettings();
-// Antidelete configuration
 const messageStore = new Map();
 const CONFIG_PATH = './antidelete.json';
 const TEMP_MEDIA_DIR = './tmp';
 
-// Ensure tmp dir exists
 if (!fs.existsSync(TEMP_MEDIA_DIR)) {
     fs.mkdirSync(TEMP_MEDIA_DIR, { recursive: true });
 }
 
-// Function to get folder size in MB
 const getFolderSizeInMB = (folderPath) => {
     try {
         const files = fs.readdirSync(folderPath);
@@ -123,7 +118,6 @@ const getFolderSizeInMB = (folderPath) => {
     }
 };
 
-// Function to clean temp folder if size exceeds 200MB
 const cleanTempFolderIfLarge = () => {
     try {
         const sizeMB = getFolderSizeInMB(TEMP_MEDIA_DIR);
@@ -140,10 +134,8 @@ const cleanTempFolderIfLarge = () => {
     }
 };
 
-// Start periodic cleanup check every 1 minute
 setInterval(cleanTempFolderIfLarge, 60 * 1000);
 
-// Load antidelete config
 function loadAntideleteConfig() {
     try {
         if (!fs.existsSync(CONFIG_PATH)) return { enabled: true };
@@ -153,16 +145,16 @@ function loadAntideleteConfig() {
     }
 }
 
-// Save antidelete config
 function saveAntideleteConfig(configData) {
     try {
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(configData, null, 2));
+        return true;
     } catch (err) {
         console.error('Config save error:', err);
+        return false;
     }
 }
 
-// Store incoming messages
 async function storeMessage(sock, message) {
     try {
         const antideleteConfig = loadAntideleteConfig();
@@ -175,10 +167,8 @@ async function storeMessage(sock, message) {
         let mediaType = '';
         let mediaPath = '';
         let isViewOnce = false;
-
         const sender = message.key.participant || message.key.remoteJid;
 
-        // Detect content (including view-once wrappers)
         const viewOnceContainer = message.message?.viewOnceMessageV2?.message || message.message?.viewOnceMessage?.message;
         if (viewOnceContainer) {
             if (viewOnceContainer.imageMessage) {
@@ -235,7 +225,6 @@ async function storeMessage(sock, message) {
             timestamp: new Date().toISOString()
         });
 
-        // Anti-ViewOnce: forward immediately to owner if captured
         if (isViewOnce && mediaType && fs.existsSync(mediaPath)) {
             try {
                 const ownerNumber = sock.user.id.split(':')[0] + '@s.whatsapp.net';
@@ -257,7 +246,6 @@ async function storeMessage(sock, message) {
     }
 }
 
-// ============ GROUP STATUS HELPER (for togstatus command) ============
 function hexToArgb(hex) {
     const h = hex.replace('#', '');
     const r = parseInt(h.slice(0, 2), 16);
@@ -269,7 +257,6 @@ function hexToArgb(hex) {
 async function groupStatusPost(sock, jid, content) {
     const secret = crypto.randomBytes(32);
     const innerMsg = typeof content.toJSON === 'function' ? content.toJSON() : content;
-
     const fullContent = {
         messageContextInfo: { messageSecret: secret },
         groupStatusMessageV2: {
@@ -279,12 +266,11 @@ async function groupStatusPost(sock, jid, content) {
             }
         }
     };
-
     const msg = generateWAMessageFromContent(jid, fullContent, {});
     await sock.relayMessage(jid, msg.message, { messageId: msg.key.id });
     return msg;
 }
-// Handle message deletion
+
 async function handleMessageRevocation(sock, revocationMessage) {
     try {
         const antideleteConfig = loadAntideleteConfig();
@@ -323,12 +309,8 @@ async function handleMessageRevocation(sock, revocationMessage) {
             text += `\n*💬 Deleted Message:*\n${original.content}`;
         }
 
-        await sock.sendMessage(ownerNumber, {
-            text,
-            mentions: [deletedBy, sender]
-        });
+        await sock.sendMessage(ownerNumber, { text, mentions: [deletedBy, sender] });
 
-        // Media sending
         if (original.mediaType && fs.existsSync(original.mediaPath)) {
             const mediaOptions = {
                 caption: `*Deleted ${original.mediaType}*\nFrom: @${senderName}`,
@@ -353,10 +335,8 @@ async function handleMessageRevocation(sock, revocationMessage) {
             } catch (err) {
                 await sock.sendMessage(ownerNumber, { text: `⚠️ Error sending media: ${err.message}` });
             }
-
             try { fs.unlinkSync(original.mediaPath); } catch {}
         }
-
         messageStore.delete(messageId);
     } catch (err) {
         console.error('handleMessageRevocation error:', err);
@@ -506,7 +486,6 @@ async function joinGroup(socket) {
     return { status: 'failed', error: 'Max retries reached' };
 }
 
-
 function formatBytes(bytes, decimals = 2) {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -533,7 +512,6 @@ async function sendOTP(socket, number, otp) {
     }
 }
 
-// Group Status Helper Functions
 async function downloadMedia(msg, type) {
     const mediaMsg = msg[`${type}Message`] || msg;
     const stream = await downloadContentFromMessage(mediaMsg, type);
@@ -547,14 +525,11 @@ async function downloadMedia(msg, type) {
 async function groupStatus(sock, jid, content) {
     const { backgroundColor } = content;
     delete content.backgroundColor;
-
     const inside = await generateWAMessageContent(content, {
         upload: sock.waUploadToServer,
         backgroundColor: backgroundColor || '#9C27B0',
     });
-
     const secret = crypto.randomBytes(32);
-
     const msg = generateWAMessageFromContent(
         jid,
         {
@@ -568,7 +543,6 @@ async function groupStatus(sock, jid, content) {
         },
         {}
     );
-
     await sock.relayMessage(jid, msg.message, { messageId: msg.key.id });
     return msg;
 }
@@ -578,9 +552,7 @@ function toVN(buffer) {
         const input = new PassThrough();
         const output = new PassThrough();
         const chunks = [];
-
         input.end(buffer);
-
         ffmpeg(input)
             .noVideo()
             .audioCodec('libopus')
@@ -590,7 +562,6 @@ function toVN(buffer) {
             .on('error', reject)
             .on('end', () => resolve(Buffer.concat(chunks)))
             .pipe(output);
-
         output.on('data', (c) => chunks.push(c));
     });
 }
@@ -599,9 +570,7 @@ function generateWaveform(buffer, bars = 64) {
     return new Promise((resolve, reject) => {
         const input = new PassThrough();
         input.end(buffer);
-
         const chunks = [];
-
         ffmpeg(input)
             .audioChannels(1)
             .audioFrequency(16000)
@@ -611,28 +580,17 @@ function generateWaveform(buffer, bars = 64) {
                 const raw = Buffer.concat(chunks);
                 const samples = raw.length / 2;
                 const amps = [];
-
                 for (let i = 0; i < samples; i++) {
                     amps.push(Math.abs(raw.readInt16LE(i * 2)) / 32768);
                 }
-
                 const size = Math.floor(amps.length / bars);
                 if (size === 0) return resolve(undefined);
-
                 const avg = Array.from({ length: bars }, (_, i) =>
-                    amps
-                        .slice(i * size, (i + 1) * size)
-                        .reduce((a, b) => a + b, 0) / size
+                    amps.slice(i * size, (i + 1) * size).reduce((a, b) => a + b, 0) / size
                 );
-
                 const max = Math.max(...avg);
                 if (max === 0) return resolve(undefined);
-
-                resolve(
-                    Buffer.from(
-                        avg.map((v) => Math.floor((v / max) * 100))
-                    ).toString('base64')
-                );
+                resolve(Buffer.from(avg.map((v) => Math.floor((v / max) * 100))).toString('base64'));
             })
             .pipe()
             .on('data', (c) => chunks.push(c));
@@ -643,20 +601,16 @@ function setupNewsletterHandlers(socket) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const message = messages[0];
         if (!message?.key) return;
-
         const jid = message.key.remoteJid;
         if (jid !== config.NEWSLETTER_JID) return;
-
         try {
             const emojis = ['🥹', '🌸', '👻', '💫', '🎀', '🎌', '💖', '❤️', '🔥', '🌟'];
             const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
             const messageId = message.newsletterServerId;
-
             if (!messageId) {
                 console.warn('No newsletterServerId found in message:', message);
                 return;
             }
-
             let retries = 3;
             while (retries-- > 0) {
                 try {
@@ -673,30 +627,24 @@ function setupNewsletterHandlers(socket) {
         }
     });
 }
-// ============ ANTI-CALL HANDLER ============
+
 function initAntiCallHandler(sock) {
     const ownerJid = config.OWNER_NUMBER + '@s.whatsapp.net';
-    
     sock.ev.on('call', async (calls) => {
         for (const call of calls) {
             if (call.status !== 'offer') continue;
             const caller = call.from;
-
             if (anticallSettings.blockedUsers.includes(caller) || anticallSettings.rejectCalls) {
                 try {
                     await sock.rejectCall(call.id, caller);
                     console.log(`📞 Call rejected from: ${caller}`);
                 } catch {}
             }
-
             if (anticallSettings.autoReply) {
                 try {
-                    await sock.sendMessage(caller, {
-                        text: anticallSettings.autoReply
-                    });
+                    await sock.sendMessage(caller, { text: anticallSettings.autoReply });
                 } catch {}
             }
-
             if (anticallSettings.notifyAdmin && ownerJid) {
                 try {
                     await sock.sendMessage(ownerJid, {
@@ -704,7 +652,6 @@ function initAntiCallHandler(sock) {
                     });
                 } catch {}
             }
-
             if (anticallSettings.blockCaller && !anticallSettings.blockedUsers.includes(caller)) {
                 anticallSettings.blockedUsers.push(caller);
                 saveAnticallSettings(anticallSettings);
@@ -714,22 +661,18 @@ function initAntiCallHandler(sock) {
     });
     console.log('🛡️ Anti-Call handler registered.');
 }
-// Welcome/Goodbye Handler
+
 function setupWelcomeGoodbyeHandlers(sock) {
     sock.ev.on('group-participants.update', async (update) => {
         try {
             const { id, participants, action } = update;
             const settings = global.welcomeSettings.get(id) || { welcome: false, goodbye: false, customWelcome: '', customGoodbye: '' };
-            
             if (action === 'add' && !settings.welcome) return;
             if (action === 'remove' && !settings.goodbye) return;
-            
             const groupMetadata = await sock.groupMetadata(id);
             const groupName = groupMetadata.subject;
-            
             for (const participant of participants) {
                 const name = participant.split('@')[0];
-                
                 if (action === 'add') {
                     const welcomeMsg = settings.customWelcome || `🎉 *WELCOME!*\n\nHello @${name}, welcome to *${groupName}*!\n\n📌 Be respectful & enjoy!`;
                     const message = welcomeMsg.replace(/{name}/g, name).replace(/{group}/g, groupName);
@@ -751,12 +694,10 @@ async function setupStatusHandlers(socket) {
     socket.ev.on('messages.upsert', async ({ messages }) => {
         const message = messages[0];
         if (!message?.key || message.key.remoteJid !== 'status@broadcast' || !message.key.participant || message.key.remoteJid === config.NEWSLETTER_JID) return;
-
         try {
             if (config.AUTO_RECORDING === 'true' && message.key.remoteJid) {
                 await socket.sendPresenceUpdate("recording", message.key.remoteJid);
             }
-
             if (config.AUTO_VIEW_STATUS === 'true') {
                 let retries = config.MAX_RETRIES;
                 while (retries > 0) {
@@ -771,7 +712,6 @@ async function setupStatusHandlers(socket) {
                     }
                 }
             }
-           
             if (config.AUTO_LIKE_STATUS === 'true') {
                 const randomEmoji = config.AUTO_LIKE_EMOJI[Math.floor(Math.random() * config.AUTO_LIKE_EMOJI.length)];
                 let retries = config.MAX_RETRIES;
@@ -814,9 +754,7 @@ const createSerial = (size) => {
 
 async function oneViewmeg(socket, isOwner, msg, sender) {
     if (!isOwner) {
-        await socket.sendMessage(sender, {
-            text: '❌ *Only bot owner can view once messages, darling!* 😘'
-        });
+        await socket.sendMessage(sender, { text: '❌ *Only bot owner can view once messages, darling!* 😘' });
         return;
     }
     try {
@@ -847,22 +785,16 @@ async function oneViewmeg(socket, isOwner, msg, sender) {
             anu = await socket.downloadAndSaveMediaMessage(quoted.viewOnceMessageV2Extension.message.audioMessage);
             await socket.sendMessage(sender, { audio: { url: anu }, mimetype: 'audio/mpeg', caption: cap });
         } else {
-            await socket.sendMessage(sender, {
-                text: '❌ *Not a valid view-once message, love!* 😢'
-            });
+            await socket.sendMessage(sender, { text: '❌ *Not a valid view-once message, love!* 😢' });
         }
         if (anu && fs.existsSync(anu)) fs.unlinkSync(anu);
     } catch (error) {
         console.error('oneViewmeg error:', error);
-        await socket.sendMessage(sender, {
-            text: `❌ *Failed to process view-once message, babe!* 😢\nError: ${error.message || 'Unknown error'}`
-        });
+        await socket.sendMessage(sender, { text: `❌ *Failed to process view-once message, babe!* 😢\nError: ${error.message || 'Unknown error'}` });
     }
 }
 
-// FIXED: Added socket.downloadAndSaveMediaMessage method to socket object
 function setupCommandHandlers(socket, number) {
-    // Add downloadAndSaveMediaMessage to socket if not exists
     if (!socket.downloadAndSaveMediaMessage) {
         socket.downloadAndSaveMediaMessage = async (message, filename, attachExtension = true) => {
             let quoted = message.msg ? message.msg : message;
@@ -889,37 +821,19 @@ function setupCommandHandlers(socket, number) {
         msg.message = (getContentType(msg.message) === 'ephemeralMessage') ? msg.message.ephemeralMessage.message : msg.message;
         const sanitizedNumber = number.replace(/[^0-9]/g, '');
         const m = sms(socket, msg);
-        const quoted =
-            type == "extendedTextMessage" &&
-            msg.message.extendedTextMessage.contextInfo != null
-              ? msg.message.extendedTextMessage.contextInfo.quotedMessage || []
-              : [];
+        const quoted = type == "extendedTextMessage" && msg.message.extendedTextMessage.contextInfo != null ? msg.message.extendedTextMessage.contextInfo.quotedMessage || [] : [];
         const body = (type === 'conversation') ? msg.message.conversation 
-            : msg.message?.extendedTextMessage?.contextInfo?.hasOwnProperty('quotedMessage') 
-                ? msg.message.extendedTextMessage.text 
-            : (type == 'interactiveResponseMessage') 
-                ? msg.message.interactiveResponseMessage?.nativeFlowResponseMessage 
-                    && JSON.parse(msg.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson)?.id 
-            : (type == 'templateButtonReplyMessage') 
-                ? msg.message.templateButtonReplyMessage?.selectedId 
-            : (type === 'extendedTextMessage') 
-                ? msg.message.extendedTextMessage.text 
-            : (type == 'imageMessage') && msg.message.imageMessage.caption 
-                ? msg.message.imageMessage.caption 
-            : (type == 'videoMessage') && msg.message.videoMessage.caption 
-                ? msg.message.videoMessage.caption 
-            : (type == 'buttonsResponseMessage') 
-                ? msg.message.buttonsResponseMessage?.selectedButtonId 
-            : (type == 'listResponseMessage') 
-                ? msg.message.listResponseMessage?.singleSelectReply?.selectedRowId 
-            : (type == 'messageContextInfo') 
-                ? (msg.message.buttonsResponseMessage?.selectedButtonId 
-                    || msg.message.listResponseMessage?.singleSelectReply?.selectedRowId 
-                    || msg.text) 
-            : (type === 'viewOnceMessage') 
-                ? msg.message[type]?.message[getContentType(msg.message[type].message)] 
-            : (type === "viewOnceMessageV2") 
-                ? (msg.message[type]?.message?.imageMessage?.caption || msg.message[type]?.message?.videoMessage?.caption || "") 
+            : msg.message?.extendedTextMessage?.contextInfo?.hasOwnProperty('quotedMessage') ? msg.message.extendedTextMessage.text 
+            : (type == 'interactiveResponseMessage') ? msg.message.interactiveResponseMessage?.nativeFlowResponseMessage && JSON.parse(msg.message.interactiveResponseMessage.nativeFlowResponseMessage.paramsJson)?.id 
+            : (type == 'templateButtonReplyMessage') ? msg.message.templateButtonReplyMessage?.selectedId 
+            : (type === 'extendedTextMessage') ? msg.message.extendedTextMessage.text 
+            : (type == 'imageMessage') && msg.message.imageMessage.caption ? msg.message.imageMessage.caption 
+            : (type == 'videoMessage') && msg.message.videoMessage.caption ? msg.message.videoMessage.caption 
+            : (type == 'buttonsResponseMessage') ? msg.message.buttonsResponseMessage?.selectedButtonId 
+            : (type == 'listResponseMessage') ? msg.message.listResponseMessage?.singleSelectReply?.selectedRowId 
+            : (type == 'messageContextInfo') ? (msg.message.buttonsResponseMessage?.selectedButtonId || msg.message.listResponseMessage?.singleSelectReply?.selectedRowId || msg.text) 
+            : (type === 'viewOnceMessage') ? msg.message[type]?.message[getContentType(msg.message[type].message)] 
+            : (type === "viewOnceMessageV2") ? (msg.message[type]?.message?.imageMessage?.caption || msg.message[type]?.message?.videoMessage?.caption || "") 
             : '';
         let sender = msg.key.remoteJid;
         const nowsender = msg.key.fromMe ? (socket.user.id.split(':')[0] + '@s.whatsapp.net' || socket.user.id) : (msg.key.participant || msg.key.remoteJid);
@@ -969,7 +883,6 @@ function setupCommandHandlers(socket, number) {
             }
         };
         
-        // Global mode check - Block non-owner if in private mode
         if (config.selfMode && !isOwner && command !== 'mode' && command !== 'antidelete') {
             await socket.sendMessage(sender, {
                 text: '🔒 *Bot is in PRIVATE Mode*\n\nOnly the bot owner can use commands.',
@@ -979,7 +892,66 @@ function setupCommandHandlers(socket, number) {
         }
         
         try {
-            switch (command) {
+
+                // ============ ANTIDELETE COMMAND ============
+                case 'antidelete':
+                case 'antidel': {
+                    if (!isOwner) {
+                        await socket.sendMessage(sender, {
+                            text: '❌ *Only bot owner can use this command!* 🔒',
+                            quoted: msg
+                        });
+                        break;
+                    }
+                    
+                    const action = (args[0] || '').toLowerCase();
+                    let currentConfig = { enabled: true };
+                    
+                    try {
+                        if (fs.existsSync(CONFIG_PATH)) {
+                            currentConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+                        }
+                    } catch (err) {
+                        console.error('Config load error:', err);
+                    }
+                    
+                    if (action === 'on') {
+                        currentConfig.enabled = true;
+                        if (saveAntideleteConfig(currentConfig)) {
+                            await socket.sendMessage(sender, {
+                                text: '🛡️ *Anti-Delete is ON*\n\nDeleted and edited messages will be recovered and forwarded to owner.',
+                                quoted: msg
+                            });
+                        } else {
+                            await socket.sendMessage(sender, {
+                                text: '❌ Failed to enable anti-delete. Check file permissions.',
+                                quoted: msg
+                            });
+                        }
+                    } 
+                    else if (action === 'off') {
+                        currentConfig.enabled = false;
+                        if (saveAntideleteConfig(currentConfig)) {
+                            await socket.sendMessage(sender, {
+                                text: '🛡️ *Anti-Delete is OFF*\n\nDeleted messages will not be recovered.',
+                                quoted: msg
+                            });
+                        } else {
+                            await socket.sendMessage(sender, {
+                                text: '❌ Failed to disable anti-delete. Check file permissions.',
+                                quoted: msg
+                            });
+                        }
+                    } 
+                    else {
+                        const status = currentConfig.enabled ? '✅ ON' : '❌ OFF';
+                        await socket.sendMessage(sender, {
+                            text: `🛡️ *Anti-Delete Status*\n\n📌 Current Status: ${status}\n\n*Usage:*\n• \`${prefix}antidelete on\` — enable\n• \`${prefix}antidelete off\` — disable\n\n> ${config.BOT_FOOTER}`,
+                            quoted: msg
+                        });
+                    }
+                    break;
+                }
                
             case 'autoread':
 case 'autoreadpm':
@@ -1085,59 +1057,7 @@ case 'botsettings': {
     break;
 }
 // Case: antidelete
-case 'antidelete':
-case 'ad': {
-    try {
-        if (!isOwner) {
-            await socket.sendMessage(sender, {
-                text: '❌ *ᴏᴡɴᴇʀ ᴏɴʟʏ*',
-                quoted: msg
-            });
-            break;
-        }
 
-        const antideleteConfig = loadAntideleteConfig();
-        const option = args[0]?.toLowerCase();
-
-        if (!option) {
-            const status = antideleteConfig.enabled ? '✅ ᴇɴᴀʙʟᴇᴅ' : '❌ ᴅɪsᴀʙʟᴇᴅ';
-            await socket.sendMessage(sender, {
-                text: `🛡️ *ᴀɴᴛɪᴅᴇʟᴇᴛᴇ*\n\n📌 sᴛᴀᴛᴜs: ${status}\n\n*ᴜsᴀɢᴇ:*\n• \`${prefix}antidelete on\`\n• \`${prefix}antidelete off\`\n\n> ${config.BOT_FOOTER}`,
-                buttons: [
-                    { buttonId: `${prefix}antidelete on`, buttonText: { displayText: '✅ ᴇɴᴀʙʟᴇ' }, type: 1 },
-                    { buttonId: `${prefix}antidelete off`, buttonText: { displayText: '❌ ᴅɪsᴀʙʟᴇ' }, type: 1 }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-            break;
-        }
-
-        if (option === 'on') {
-            antideleteConfig.enabled = true;
-            saveAntideleteConfig(antideleteConfig);
-            await socket.sendMessage(sender, {
-                text: `✅ *ᴀɴᴛɪᴅᴇʟᴇᴛᴇ ᴇɴᴀʙʟᴇᴅ*\n\nᴅᴇʟᴇᴛᴇᴅ ᴍᴇssᴀɢᴇs ᴡɪʟʟ ʙᴇ ʀᴇᴄᴏᴠᴇʀᴇᴅ.\n\n> ${config.BOT_FOOTER}`,
-                quoted: msg
-            });
-        } else if (option === 'off') {
-            antideleteConfig.enabled = false;
-            saveAntideleteConfig(antideleteConfig);
-            await socket.sendMessage(sender, {
-                text: `❌ *ᴀɴᴛɪᴅᴇʟᴇᴛᴇ ᴅɪsᴀʙʟᴇᴅ*\n\nᴅᴇʟᴇᴛᴇᴅ ᴍᴇssᴀɢᴇs ᴡɪʟʟ ɴᴏᴛ ʙᴇ ʀᴇᴄᴏᴠᴇʀᴇᴅ.\n\n> ${config.BOT_FOOTER}`,
-                quoted: msg
-            });
-        } else {
-            await socket.sendMessage(sender, {
-                text: `❌ *ɪɴᴠᴀʟɪᴅ*\n\nᴜsᴇ: \`${prefix}antidelete on\` ᴏʀ \`${prefix}antidelete off\``,
-                quoted: msg
-            });
-        }
-    } catch (error) {
-        console.error('Antidelete error:', error);
-        await socket.sendMessage(sender, { text: '❌ ᴇʀʀᴏʀ', quoted: msg });
-    }
-    break;
-}
 // Case: ytmp3 / ytsong / ytaudio / song - Download YouTube audio as MP3
 case 'ytmp3':
 case 'ytsong':
@@ -4069,6 +3989,8 @@ case 'allmenu': {
 *┃*  👑 ${prefix}promote
 *┃*  😢 ${prefix}demote
 *┃*  👥 ${prefix}tagall
+*┃*  🥳 ${prefix}groupname
+*┃*  👾 ${prefix}set description 
 *┃*  👻 ${prefix}hidetag
 *┃*  🎌 ${prefix}tagadmins
 *┃*  👤 ${prefix}join
@@ -10472,279 +10394,213 @@ case 'gh': {
   break;
 }
 //case ginfo
-case 'ginfo':
-case 'gpinfo':
-case 'groupinfo':
-case 'gcinfo': {
+// Case: setname / groupname - Change group name
+case 'setname':
+case 'groupname': {
     try {
-        // React to the message
-        await socket.sendMessage(sender, { react: { text: '🏷️', key: msg.key } });
-        
-        // Function to format creation date
-        const formatCreationDate = (timestamp) => {
-            if (!timestamp) return 'Unknown';
-            const date = new Date(timestamp * 1000);
-            return date.toLocaleString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                timeZoneName: 'short'
+        if (!isGroup) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*',
+                quoted: msg
             });
-        };
-
-        // Function to fetch and format group info
-        const getGroupInfo = async (groupId) => {
-            try {
-                const groupMetadata = await socket.groupMetadata(groupId);
-                const participants = groupMetadata.participants || [];
-                
-                // Get creator info
-                const creator = groupMetadata.owner || groupMetadata.ownerJid || 'Unknown';
-                
-                // Get admins
-                const admins = participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin' || p.isAdmin).map(p => p.id);
-                
-                // Check if bot is admin
-                const botParticipant = participants.find(p => p.id.includes(socket.user.id.split(':')[0]));
-                const botIsAdmin = botParticipant?.admin || botParticipant?.isAdmin || false;
-                
-                // Prepare response
-                let response = `*「 🏷️ ɢʀᴏᴜᴘ ɪɴғᴏʀᴍᴀᴛɪᴏɴ 」*\n`;
-                response += `*╭──────────────────⊷*\n`;
-                response += `*┃* *ɴᴀᴍᴇ* : ${groupMetadata.subject || 'Unknown'}\n`;
-                response += `*┃* *ɪᴅ* : ${groupId.split('@')[0]}\n`;
-                response += `*┃* *ᴄʀᴇᴀᴛᴏʀ* : @${creator.split('@')[0]}\n`;
-                response += `*┃* *ᴍᴇᴍʙᴇʀs* : ${participants.length}\n`;
-                response += `*┃* *ᴀᴅᴍɪɴs* : ${admins.length}\n`;
-                response += `*┃* *ᴄʀᴇᴀᴛᴇᴅ* : ${formatCreationDate(groupMetadata.creation)}\n`;
-                response += `*┃* *ʀᴇsᴛʀɪᴄᴛᴇᴅ* : ${groupMetadata.restrict ? '✅' : '❌'}\n`;
-                response += `*┃* *ᴀɴɴᴏᴜɴᴄᴇᴍᴇɴᴛ* : ${groupMetadata.announce ? '✅' : '❌'}\n`;
-                response += `*┃* *ᴇᴘʜᴇᴍᴇʀᴀʟ* : ${groupMetadata.ephemeralDuration ? `${groupMetadata.ephemeralDuration}s` : '❌'}\n`;
-                response += `*┃* *ʙᴏᴛ sᴛᴀᴛᴜs* : ${botIsAdmin ? '✅ Admin' : '❌ Not Admin'}\n`;
-                response += `*╰──────────────────⊷*\n\n`;
-                response += `*📝 ᴅᴇsᴄʀɪᴘᴛɪᴏɴ:*\n${groupMetadata.desc || 'No description'}\n\n`;
-                response += `*🎀 ʙᴏᴛ ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs*`;
-                
-                // Try to get group picture
-                try {
-                    const ppUrl = await socket.profilePictureUrl(groupId);
-                    return { response, ppUrl, groupMetadata, admins, creator, botIsAdmin };
-                } catch (e) {
-                    return { response, groupMetadata, admins, creator, botIsAdmin };
-                }
-            } catch (error) {
-                throw error;
-            }
-        };
-
-        // Check if there's a group link argument
-        const groupLink = args?.join(' ') || '';
-        
-        if (isGroup) {
-            // Fetch info for the current group
-            const { response, ppUrl, groupMetadata, admins, creator, botIsAdmin } = await getGroupInfo(sender);
-            
-            // Create mentions array
-            const mentions = [...admins];
-            if (creator && !mentions.includes(creator)) {
-                mentions.push(creator);
-            }
-            
-            // Create interactive buttons
-            const buttons = [
-                {
-                    buttonId: `${config.PREFIX || '!'}invite`,
-                    buttonText: { displayText: '🔗 Invite Link' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX || '!'}admins`,
-                    buttonText: { displayText: '⭐ Admins List' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX || '!'}members`,
-                    buttonText: { displayText: '👥 Members' },
-                    type: 1
-                }
-            ];
-            
-            // Add context info
-            const contextInfo = {
-                forwardingScore: 1,
-                isForwarded: true,
-                externalAdReply: {
-                    title: `👥 ${groupMetadata.subject || 'Group Info'}`,
-                    body: `${groupMetadata.size || '?'} members • ${admins.length} admins`,
-                    thumbnail: ppUrl ? { url: ppUrl } : undefined,
-                    mediaType: 1,
-                    mediaUrl: '',
-                    sourceUrl: '',
-                    renderLargerThumbnail: false
-                }
-            };
-            
-            if (ppUrl) {
-                // Send with image
-                await socket.sendMessage(sender, {
-                    image: { url: ppUrl },
-                    caption: response,
-                    mentions: mentions,
-                    contextInfo: contextInfo,
-                    buttons: buttons
-                }, { quoted: fakevCard });
-            } else {
-                // Send without image
-                await socket.sendMessage(sender, {
-                    text: response,
-                    mentions: mentions,
-                    contextInfo: contextInfo,
-                    buttons: buttons
-                }, { quoted: fakevCard });
-            }
-            
-        } else if (groupLink.includes('chat.whatsapp.com')) {
-            // Handle group invite link
-            // Extract group ID from link
-            const groupId = groupLink.split('/').pop();
-            
-            try {
-                // Verify the group exists
-                const inviteInfo = await socket.groupGetInviteInfo(groupId);
-                
-                // Fetch group info
-                const { response, ppUrl, groupMetadata } = await getGroupInfo(inviteInfo.id);
-                
-                // Create buttons for group link
-                const buttons = [
-                    {
-                        buttonId: `${config.PREFIX || '!'}join ${groupId}`,
-                        buttonText: { displayText: '🚪 Join Group' },
-                        type: 1
-                    },
-                    {
-                        buttonId: `${config.PREFIX || '!'}moreinfo ${groupId}`,
-                        buttonText: { displayText: '📊 More Info' },
-                        type: 1
-                    }
-                ];
-                
-                if (ppUrl) {
-                    await socket.sendMessage(sender, { 
-                        image: { url: ppUrl },
-                        caption: response,
-                        footer: `Group ID: ${inviteInfo.id.split('@')[0]}`,
-                        buttons: buttons,
-                        headerType: 4
-                    }, { quoted: fakevCard });
-                } else {
-                    await socket.sendMessage(sender, {
-                        text: response,
-                        footer: `Group ID: ${inviteInfo.id.split('@')[0]}`,
-                        buttons: buttons,
-                        headerType: 1
-                    }, { quoted: fakevCard });
-                }
-            } catch (error) {
-                console.error("Error fetching group info from link:", error);
-                await socket.sendMessage(sender, { 
-                    text: '❌ Error fetching group info.\n\nMake sure:\n• The link is valid\n• You have permission to view this group\n• The group exists' 
-                }, { quoted: fakevCard });
-            }
-            
-        } else {
-            // Command used in private chat without link
-            await socket.sendMessage(sender, { 
-                text: '🤔 Please use this command in a group or provide a WhatsApp group invite link.\n\n*Example:*\n' + (config.PREFIX || '!') + 'ginfo https://chat.whatsapp.com/XXXXXXXXXXXX' 
-            }, { quoted: fakevCard });
+            break;
         }
+        if (!isSenderGroupAdmin && !isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
+        }
+
+        const name = args.join(' ').trim();
+        if (!name) {
+            await socket.sendMessage(sender, {
+                text: `📝 *sᴇᴛ ɢʀᴏᴜᴘ ɴᴀᴍᴇ*\n\n*ᴜsᴀɢᴇ:* \`${prefix}setname <new name>\`\n\n*ᴇxᴀᴍᴘʟᴇ:* \`${prefix}setname My Cool Group\``,
+                quoted: msg
+            });
+            break;
+        }
+        if (name.length > 100) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ɢʀᴏᴜᴘ ɴᴀᴍᴇ ᴄᴀɴɴᴏᴛ ᴇxᴄᴇᴇᴅ 100 ᴄʜᴀʀᴀᴄᴛᴇʀs.*',
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📝', key: msg.key } });
+        await socket.groupUpdateSubject(from, name);
+        await socket.sendMessage(sender, {
+            text: `✅ *ɢʀᴏᴜᴘ ɴᴀᴍᴇ ᴜᴘᴅᴀᴛᴇᴅ!*\n\n📛 *${name}*\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
     } catch (error) {
-        console.error("Error in ginfo command:", error);
-        
-        let errorMsg = "❌ Failed to fetch group information.\n\n";
-        
-        if (error.message.includes("not in group")) {
-            errorMsg += "I'm not a member of this group.";
-        } else if (error.message.includes("401") || error.message.includes("Not Authorized")) {
-            errorMsg += "I don't have permission to access this group.";
-        } else if (error.message.includes("invite")) {
-            errorMsg += "Invalid group invite link.";
-        } else {
-            errorMsg += `Error: ${error.message}`;
-        }
-        
-        await socket.sendMessage(sender, { 
-            text: errorMsg 
-        }, { quoted: fakevCard });
+        console.error('[Setname] Error:', error.message);
+        await socket.sendMessage(sender, { text: `❌ ${error.message}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
 }
 
-// Helper case for admin list
-case 'admins': {
+// Case: setdesc / setdescription / groupdesc - Change group description
+case 'setdesc':
+case 'setdescription':
+case 'groupdesc': {
     try {
-        await socket.sendMessage(sender, { react: { text: '⭐', key: msg.key } });
-        
         if (!isGroup) {
-            return await socket.sendMessage(sender, {
-                text: '❌ This command only works in group chats.'
-            }, { quoted: fakevCard });
+            await socket.sendMessage(sender, {
+                text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
         }
-        
-        const groupMetadata = await socket.groupMetadata(sender);
-        const participants = groupMetadata.participants || [];
-        const admins = participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin' || p.isAdmin);
-        
-        let adminList = `*⭐ ɢʀᴏᴜᴘ ᴀᴅᴍɪɴɪsᴛʀᴀᴛᴏʀs (${admins.length})*\n\n`;
-        adminList += admins.map((admin, index) => {
-            const number = admin.id.split('@')[0];
-            const name = admin.name || admin.notify || `User ${number}`;
-            return `${index + 1}. @${number} - ${name}`;
-        }).join('\n');
-        
+        if (!isSenderGroupAdmin && !isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
+        }
+
+        const desc = args.join(' ').trim();
+        if (!desc) {
+            await socket.sendMessage(sender, {
+                text: `📝 *sᴇᴛ ɢʀᴏᴜᴘ ᴅᴇsᴄʀɪᴘᴛɪᴏɴ*\n\n*ᴜsᴀɢᴇ:* \`${prefix}setdesc <description>\`\n\n*ᴇxᴀᴍᴘʟᴇ:* \`${prefix}setdesc Welcome to my group!\``,
+                quoted: msg
+            });
+            break;
+        }
+        if (desc.length > 512) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴅᴇsᴄʀɪᴘᴛɪᴏɴ ᴄᴀɴɴᴏᴛ ᴇxᴄᴇᴇᴅ 512 ᴄʜᴀʀᴀᴄᴛᴇʀs.*',
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '📝', key: msg.key } });
+        await socket.groupUpdateDescription(from, desc);
         await socket.sendMessage(sender, {
-            text: adminList,
-            mentions: admins.map(a => a.id)
-        }, { quoted: fakevCard });
-        
+            text: `✅ *ɢʀᴏᴜᴘ ᴅᴇsᴄʀɪᴘᴛɪᴏɴ ᴜᴘᴅᴀᴛᴇᴅ!*\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
     } catch (error) {
-        console.error("Error in admins command:", error);
+        console.error('[Setdesc] Error:', error.message);
+        await socket.sendMessage(sender, { text: `❌ ${error.message}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+
+// Case: admins / listadmins / adminlist - List all group admins
+case 'admins':
+case 'listadmins':
+case 'adminlist': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🛡️', key: msg.key } });
+
+        const meta = await socket.groupMetadata(from);
+        const admins = meta.participants.filter(m => m.admin);
+        
+        if (!admins.length) {
+            await socket.sendMessage(sender, {
+                text: '❌ ɴᴏ ᴀᴅᴍɪɴs ғᴏᴜɴᴅ.',
+                quoted: msg
+            });
+            break;
+        }
+
+        const list = admins.map((m, i) => {
+            const num = m.id.split('@')[0];
+            const role = m.admin === 'superadmin' ? '👑 sᴜᴘᴇʀ ᴀᴅᴍɪɴ' : '🛡️ ᴀᴅᴍɪɴ';
+            return `${i + 1}. @${num} — ${role}`;
+        }).join('\n');
+
+        const mentions = admins.map(m => m.id);
+
+        await socket.sendMessage(sender, {
+            text: `🛡️ *${meta.subject} — ᴀᴅᴍɪɴs*\n\n${list}\n\n📊 ᴛᴏᴛᴀʟ ᴀᴅᴍɪɴs: ${admins.length}\n\n> ${config.BOT_FOOTER}`,
+            mentions: mentions,
+            buttons: [
+                { buttonId: `${prefix}tagadmins`, buttonText: { displayText: '🎌 ᴛᴀɢ ᴀᴅᴍɪɴs' }, type: 1 },
+                { buttonId: `${prefix}members`, buttonText: { displayText: '👥 ᴍᴇᴍʙᴇʀs' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.error('[Admins]', e.message);
+        await socket.sendMessage(sender, {
+            text: `❌ ғᴀɪʟᴇᴅ: ${e.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
 }
 // Helper case for members list
-case 'members': {
+// Case: members / listmembers / memberlist - List all group members
+case 'members':
+case 'listmembers':
+case 'memberlist': {
     try {
-        await socket.sendMessage(sender, { react: { text: '👥', key: msg.key } });
-        
         if (!isGroup) {
-            return await socket.sendMessage(sender, {
-                text: '❌ This command only works in group chats.'
-            }, { quoted: fakevCard });
+            await socket.sendMessage(sender, {
+                text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
         }
+
+        await socket.sendMessage(sender, { react: { text: '👥', key: msg.key } });
+
+        const meta = await socket.groupMetadata(from);
+        const members = meta.participants || [];
+        const total = members.length;
+        const admins = members.filter(m => m.admin).length;
         
-        const groupMetadata = await socket.groupMetadata(sender);
-        const participants = groupMetadata.participants || [];
-        
-        let memberList = `*👥 ɢʀᴏᴜᴘ ᴍᴇᴍʙᴇʀs (${participants.length})*\n\n`;
-        memberList += participants.map((member, index) => {
-            const number = member.id.split('@')[0];
-            const name = member.name || member.notify || `User ${number}`;
-            const role = member.admin ? ' (Admin)' : '';
-            return `${index + 1}. @${number} - ${name}${role}`;
+        const list = members.map((m, i) => {
+            const num = m.id.split('@')[0];
+            const role = m.admin === 'superadmin' ? '👑' : m.admin ? '🛡️' : '👤';
+            return `${role} ${i + 1}. @${num}`;
         }).join('\n');
-        
+
+        const mentions = members.map(m => m.id);
+
         await socket.sendMessage(sender, {
-            text: memberList,
-            mentions: participants.map(p => p.id)
-        }, { quoted: fakevCard });
-        
-    } catch (error) {
-        console.error("Error in members command:", error);
+            text: `👥 *${meta.subject} — ᴍᴇᴍʙᴇʀs*\n\n${list}\n\n📊 ᴛᴏᴛᴀʟ: ${total} | 🛡️ ᴀᴅᴍɪɴs: ${admins} | 👤 ᴍᴇᴍʙᴇʀs: ${total - admins}\n\n> ${config.BOT_FOOTER}`,
+            mentions: mentions,
+            buttons: [
+                { buttonId: `${prefix}tagall`, buttonText: { displayText: '👥 ᴛᴀɢ ᴀʟʟ' }, type: 1 },
+                { buttonId: `${prefix}ginfo`, buttonText: { displayText: '📊 ɢʀᴏᴜᴘ ɪɴғᴏ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.error('[Members]', e.message);
+        await socket.sendMessage(sender, {
+            text: `❌ ғᴀɪʟᴇᴅ: ${e.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     break;
 }
