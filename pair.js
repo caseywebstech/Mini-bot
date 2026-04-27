@@ -892,6 +892,7 @@ function setupCommandHandlers(socket, number) {
         }
         
         try {
+			 switch (command) {
 
                 // ============ ANTIDELETE COMMAND ============
                 case 'antidelete':
