@@ -3934,9 +3934,11 @@ case 'allmenu': {
 *┃*  📜 ${prefix}allmenu
 *┃*  📊 ${prefix}ginfo
 *┃*  👥 ${prefix}members
+*┃*  🛡️ ${prefix}admins
 *┃*  🌟 ${prefix}profile
 *┃*  📸 ${prefix}igstalk
 *┃*  🔮 ${prefix}repo
+*┃*  🔮 ${prefix}github
 *┃*  🎀 ${prefix}gitclone
 *┃*  👑 ${prefix}owner
 *┃*  🔗 ${prefix}pair
@@ -3963,14 +3965,18 @@ case 'allmenu': {
 
  ╭─『 🎵 *ᴅᴏᴡɴʟᴏᴀᴅs* 』─╮
 *┃*  🎵 ${prefix}song
+*┃*  🎵 ${prefix}ytmp3
 *┃*  🎊 ${prefix}play
 *┃*  📱 ${prefix}tiktok
+*┃*  📱 ${prefix}tt
 *┃*  📘 ${prefix}fb
+*┃*  📘 ${prefix}fbdl
 *┃*  📸 ${prefix}ig
 *┃*  🎵 ${prefix}shazam
 *┃*  🎵 ${prefix}lyrics
 *┃*  📤 ${prefix}tourl
 *┃*  📁 ${prefix}mf
+*┃*  📁 ${prefix}mediafire
 *┃*  📦 ${prefix}apk
 *┃*  🖼️ ${prefix}aiimg
 *┃*  👀 ${prefix}viewonce
@@ -3983,24 +3989,45 @@ case 'allmenu': {
 *┃*  ➕ ${prefix}add
 *┃*  🦶 ${prefix}kick
 *┃*  🔓 ${prefix}open
+*┃*  🔓 ${prefix}unmute
 *┃*  🔒 ${prefix}close
+*┃*  🔒 ${prefix}mute
 *┃*  👑 ${prefix}promote
 *┃*  😢 ${prefix}demote
+*┃*  🔗 ${prefix}link
+*┃*  🔗 ${prefix}grouplink
+*┃*  🔄 ${prefix}revoke
+*┃*  📝 ${prefix}setname
+*┃*  📝 ${prefix}groupname
+*┃*  📝 ${prefix}setdesc
+*┃*  📝 ${prefix}gcdesc
 *┃*  👥 ${prefix}tagall
-*┃*  🥳 ${prefix}groupname
-*┃*  👾 ${prefix}set description 
 *┃*  👻 ${prefix}hidetag
 *┃*  🎌 ${prefix}tagadmins
 *┃*  👤 ${prefix}join
 *┃*  💠 ${prefix}leave
+*┃*  💠 ${prefix}left
 *┃*  📊 ${prefix}poll
 *┃*  📢 ${prefix}togstatus
 *┃*  👋 ${prefix}welcome
 *┃*  👋 ${prefix}goodbye
+*┃*  👋 ${prefix}setwelcome
+*┃*  👋 ${prefix}setgoodbye
 *┃*  📇 ${prefix}vcfgen
 *┃*  📇 ${prefix}vcfgroup
 *┃*  📇 ${prefix}vcfnumber
 *┃*  📇 ${prefix}vcfread
+*┃*  📋 ${prefix}auditlog
+*┃*  📋 ${prefix}listrequests
+*┃*  ✅ ${prefix}accept
+*┃*  ✅ ${prefix}acceptall
+*┃*  ❌ ${prefix}reject
+*┃*  ❌ ${prefix}rejectall
+*┃*  ⏳ ${prefix}disapp
+*┃*  🗑️ ${prefix}del
+*┃*  ⚙️ ${prefix}groupsettings
+*┃*  📢 ${prefix}everyone
+*┃*  🖼️ ${prefix}gcpp
 *╰──────────────⊷*
 
  ╭─『 ⚽ *sᴘᴏʀᴛs* 』─╮
@@ -4032,6 +4059,8 @@ case 'allmenu': {
  ╭─『 ⚙️ *ᴏᴡɴᴇʀ* 』─╮
 *┃*  ⚙️ ${prefix}settings
 *┃*  🔰 ${prefix}antidelete
+*┃*  🔰 ${prefix}ad
+*┃*  🔰 ${prefix}antidel
 *┃*  🛡️ ${prefix}anticall
 *┃*  📖 ${prefix}autoread
 *┃*  👁️ ${prefix}bluetick
@@ -4039,8 +4068,11 @@ case 'allmenu': {
 *┃*  ⚡ ${prefix}eval
 *┃*  📢 ${prefix}poststatus
 *┃*  📢 ${prefix}broadcast
+*┃*  📢 ${prefix}bc
 *┃*  👁️ ${prefix}presence
+*┃*  👁️ ${prefix}typing
 *┃*  🔰 ${prefix}setpp
+*┃*  💀 ${prefix}killgc
 *╰──────────────⊷*
 
  ╭─『 🔧 *ᴛᴏᴏʟs* 』─╮
@@ -4050,6 +4082,7 @@ case 'allmenu': {
 *┃*  🌦️ ${prefix}weather
 *┃*  🔗 ${prefix}shorturl
 *┃*  💾 ${prefix}savestatus
+*┃*  💾 ${prefix}save
 *┃*  🖼️ ${prefix}getpp
 *┃*  🚫 ${prefix}block
 *┃*  🚩 ${prefix}blocklist
@@ -4057,6 +4090,7 @@ case 'allmenu': {
 *┃*  📲 ${prefix}fc
 *┃*  📜 ${prefix}pdf
 *┃*  📱 ${prefix}send
+*┃*  📇 ${prefix}vcf
 *╰──────────────⊷*
 
 > *ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴛᴇᴄʜ* ッ
@@ -4266,209 +4300,6 @@ case 'follow': {
     });
   }
   break;
-}
-//case npm
-case 'npm': {
-    try {
-        // React to the message
-        await socket.sendMessage(sender, { react: { text: '📦', key: msg.key } });
-        
-        // Check if a package name is provided
-        if (!args || args.length === 0) {
-            return await socket.sendMessage(sender, { 
-                text: "Please provide the name of the npm package you want to search for.\n\nExample: " + (config.PREFIX || '!') + "npm express" 
-            }, { quoted: fakevCard });
-        }
-
-        const packageName = args.join(" ");
-        const apiUrl = `https://registry.npmjs.org/${encodeURIComponent(packageName)}`;
-
-        // Fetch package details from npm registry using fetch
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-            throw new Error(`Package "${packageName}" not found (Status: ${response.status})`);
-        }
-
-        const packageData = await response.json();
-        const latestVersion = packageData["dist-tags"]?.latest || "Unknown";
-        const description = packageData.description || "No description available.";
-        const npmUrl = `https://www.npmjs.com/package/${packageName}`;
-        const license = packageData.license || "Unknown";
-        
-        // Clean repository URL
-        let repository = "Not available";
-        if (packageData.repository) {
-            repository = packageData.repository.url || "Not available";
-            if (repository.startsWith("git+")) {
-                repository = repository.replace("git+", "");
-            }
-            if (repository.endsWith(".git")) {
-                repository = repository.replace(".git", "");
-            }
-        }
-
-        // Get additional info if available
-        const author = packageData.author?.name || "Unknown";
-        const keywords = packageData.keywords ? packageData.keywords.join(", ") : "None";
-        const homepage = packageData.homepage || "Not specified";
-
-        // Create the response message
-        const message = `
-*🎀 ᴄᴀsᴇʏʀʜᴏᴅᴇs ɴᴘᴍ sᴇᴀʀᴄʜ 🎀*
-
-*╭──────────────⊷*
-*┃* *ᴘᴀᴄᴋᴀɢᴇ* : ${packageName}
-*┃* *ᴠᴇʀsɪᴏɴ* : ${latestVersion}
-*┃* *ᴀᴜᴛʜᴏʀ* : ${author}
-*┃* *ʟɪᴄᴇɴsᴇ* : ${license}
-*┃* *ᴅᴇsᴄʀɪᴘᴛɪᴏɴ* : ${description}
-*┃* *ʀᴇᴘᴏsɪᴛᴏʀʏ* : ${repository}
-*┃* *ʜᴏᴍᴇᴘᴀɢᴇ* : ${homepage}
-*┃* *ᴋᴇʏᴡᴏʀᴅs* : ${keywords}
-*┃* *ɴᴘᴍ ᴜʀʟ* : ${npmUrl}
-*╰──────────────⊷*
-`;
-
-        // Add thumbnail context for better presentation
-        const contextInfo = {
-            externalAdReply: {
-                title: `📦 ${packageName}@${latestVersion}`,
-                body: `by ${author} • ${license} license`,
-                thumbnail: { url: 'https://static.npmjs.com/255a118f56f5346b97e56325a1217a16.svg' },
-                mediaType: 1,
-                mediaUrl: npmUrl,
-                sourceUrl: npmUrl,
-                renderLargerThumbnail: true
-            }
-        };
-
-        // Create message with interactive buttons
-        const npmMessage = {
-            text: message,
-            contextInfo: contextInfo,
-            buttons: [
-                {
-                    buttonId: `${config.PREFIX || '!'}npm-copy ${packageName}`,
-                    buttonText: { displayText: '📋 Copy Install' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX || '!'}npm-goto ${packageName}`,
-                    buttonText: { displayText: '🌐 Visit NPM' },
-                    type: 1
-                },
-                {
-                    buttonId: `${config.PREFIX || '!'}npm-stats ${packageName}`,
-                    buttonText: { displayText: '📊 Get Stats' },
-                    type: 1
-                }
-            ]
-        };
-
-        await socket.sendMessage(sender, npmMessage, { quoted: fakevCard });
-
-    } catch (error) {
-        console.error("Error in npm command:", error);
-        
-        // Send user-friendly error message
-        let errorMsg = "❌ Failed to fetch npm package details.\n\n";
-        
-        if (error.message.includes("not found") || error.message.includes("404")) {
-            errorMsg += `Package *"${args?.join(" ") || "Unknown"}"* was not found on npm registry.\n`;
-            errorMsg += "Please check the package name and try again.";
-        } else if (error.message.includes("network") || error.message.includes("fetch")) {
-            errorMsg += "Network error occurred. Please check your internet connection.";
-        } else {
-            errorMsg += `Error: ${error.message}`;
-        }
-        
-        await socket.sendMessage(sender, { 
-            text: errorMsg 
-        }, { quoted: fakevCard });
-    }
-    break;
-}
-
-// Helper cases for button actions
-case 'npm-copy': {
-    try {
-        await socket.sendMessage(sender, { react: { text: '📋', key: msg.key } });
-        
-        const packageName = args?.[0] || args?.join(" ") || "unknown";
-        
-        await socket.sendMessage(sender, {
-            text: `📦 *Install Commands for ${packageName}:*\n\n\`\`\`bash\n# npm\nnpm install ${packageName}\n\n# yarn\nyarn add ${packageName}\n\n# pnpm\npnpm add ${packageName}\n\n# bun\nbun add ${packageName}\n\`\`\`\n\n📋 *Copy any of the above commands*`
-        }, { quoted: fakevCard });
-    } catch (error) {
-        console.error("Error in npm-copy:", error);
-    }
-    break;
-}
-
-case 'npm-goto': {
-    try {
-        await socket.sendMessage(sender, { react: { text: '🌐', key: msg.key } });
-        
-        const packageName = args?.[0] || args?.join(" ") || "unknown";
-        const npmUrl = `https://www.npmjs.com/package/${packageName}`;
-        
-        await socket.sendMessage(sender, {
-            text: `🌐 *NPM Package Link:*\n${npmUrl}\n\nClick the button below or copy the URL to visit the package page.`,
-            contextInfo: {
-                externalAdReply: {
-                    title: `📦 ${packageName}`,
-                    body: 'Click to open in browser',
-                    thumbnail: { url: 'https://static.npmjs.com/255a118f56f5346b97e56325a1217a16.svg' },
-                    mediaType: 1,
-                    mediaUrl: npmUrl,
-                    sourceUrl: npmUrl,
-                    renderLargerThumbnail: true
-                }
-            }
-        }, { quoted: fakevCard });
-    } catch (error) {
-        console.error("Error in npm-goto:", error);
-    }
-    break;
-}
-
-case 'npm-stats': {
-    try {
-        await socket.sendMessage(sender, { react: { text: '📊', key: msg.key } });
-        
-        const packageName = args?.[0] || args?.join(" ") || "unknown";
-        
-        // Try to get download stats
-        const statsUrl = `https://api.npmjs.org/downloads/point/last-week/${packageName}`;
-        
-        const response = await fetch(statsUrl);
-        let statsMessage = `📊 *Download Statistics for ${packageName}:*\n\n`;
-        
-        if (response.ok) {
-            const stats = await response.json();
-            if (stats.downloads !== undefined) {
-                statsMessage += `*Last Week:* ${stats.downloads.toLocaleString()} downloads\n`;
-                statsMessage += `*Period:* ${stats.start} to ${stats.end}\n\n`;
-            } else {
-                statsMessage += "No download data available for this package.\n\n";
-            }
-        } else {
-            statsMessage += "Could not fetch download statistics.\n\n";
-        }
-        
-        // Add more stats if available
-        statsMessage += `📈 *View more stats:*\nhttps://npm-stat.com/charts.html?package=${packageName}`;
-        
-        await socket.sendMessage(sender, {
-            text: statsMessage
-        }, { quoted: fakevCard });
-    } catch (error) {
-        console.error("Error in npm-stats:", error);
-        await socket.sendMessage(sender, {
-            text: `📊 *Statistics:*\nUnable to fetch statistics for "${args?.[0] || 'package'}".`
-        }, { quoted: fakevCard });
-    }
-    break;
 }
 // Case: poll / vote - Create a WhatsApp native poll
 case 'poll':
@@ -4835,9 +4666,7 @@ case 'instagramstalk': {
 // Case: pair
 // Case: pair
 case 'pair': {
-    // ✅ Fix for node-fetch v3.x (ESM-only module)
     const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
-    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
     const q = msg.message?.conversation ||
               msg.message?.extendedTextMessage?.text ||
@@ -4848,51 +4677,85 @@ case 'pair': {
 
     if (!number) {
         return await socket.sendMessage(sender, {
-            text: '*📌 Usage:* .pair 254103488793\n\n*Example:* .pair 254Xxx'
-        }, { quoted: msg });
+            text: `*📌 ᴘᴀɪʀɪɴɢ*\n\n*ᴜsᴀɢᴇ:* \`${prefix}pair 25410XXXXXX\`\n\n*ᴇxᴀᴍᴘʟᴇ:* \`${prefix}pair 254712345678\`\n\n> ${config.BOT_FOOTER}`,
+            quoted: msg
+        });
     }
+
+    await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } });
 
     try {
         const url = `https://mini-bot-1-9vf1.onrender.com/code?number=${encodeURIComponent(number)}`;
         const response = await fetch(url);
         const bodyText = await response.text();
 
-        console.log("💗 API Response:", bodyText);
-
         let result;
         try {
             result = JSON.parse(bodyText);
         } catch (e) {
-            console.error("❌ JSON Parse Error:", e);
             return await socket.sendMessage(sender, {
-                text: '❌ Invalid response from server. Please contact support.'
-            }, { quoted: msg });
+                text: '❌ ɪɴᴠᴀʟɪᴅ ʀᴇsᴘᴏɴsᴇ ғʀᴏᴍ sᴇʀᴠᴇʀ.',
+                quoted: msg
+            });
         }
 
         if (!result || !result.code) {
             return await socket.sendMessage(sender, {
-                text: '❌ Failed to retrieve pairing code. Please check the number format and try again.'
+                text: '❌ ғᴀɪʟᴇᴅ ᴛᴏ ʀᴇᴛʀɪᴇᴠᴇ ᴘᴀɪʀɪɴɢ ᴄᴏᴅᴇ.',
+                quoted: msg
+            });
+        }
+
+        // METHOD 1: CTA Copy button (works on some Baileys versions)
+        const copyButtonMessage = {
+            text: `*📋 ᴛᴀᴘ ᴛʜᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴄᴏᴘʏ ʏᴏᴜʀ ᴄᴏᴅᴇ*`,
+            footer: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ',
+            templateButtons: [
+                {
+                    index: 1,
+                    copyCodeButton: {
+                        displayText: '📋 ᴄᴏᴘʏ ᴘᴀɪʀɪɴɢ ᴄᴏᴅᴇ',
+                        code: result.code
+                    }
+                },
+                {
+                    index: 2,
+                    quickReplyButton: {
+                        displayText: '👨‍💻 sᴜᴘᴘᴏʀᴛ',
+                        id: `${prefix}owner`
+                    }
+                }
+            ],
+            headerType: 1
+        };
+
+        // Try sending with copy button
+        try {
+            await socket.sendMessage(sender, copyButtonMessage, { quoted: msg });
+        } catch (copyError) {
+            // Fallback: Send code as standalone message for easy copying
+            console.log('Copy button not supported, using fallback');
+            await socket.sendMessage(sender, {
+                text: `*🔑 ʏᴏᴜʀ ᴘᴀɪʀɪɴɢ ᴄᴏᴅᴇ:*\n\n\`\`\`${result.code}\`\`\`\n\n_ᴛᴀᴘ & ʜᴏʟᴅ ᴛʜᴇ ᴄᴏᴅᴇ ᴀʙᴏᴠᴇ ᴛᴏ ᴄᴏᴘʏ ɪᴛ_`,
+                buttons: [
+                    { buttonId: `${prefix}owner`, buttonText: { displayText: '👨‍💻 sᴜᴘᴘᴏʀᴛ' }, type: 1 },
+                    { buttonId: `${prefix}pair`, buttonText: { displayText: '🔄 ɴᴇᴡ ᴄᴏᴅᴇ' }, type: 1 }
+                ],
+                headerType: 1
             }, { quoted: msg });
         }
 
-        // Send single comprehensive message with only one button
-        await socket.sendMessage(sender, {
-            image: { url: 'https://i.ibb.co/fGSVG8vJ/caseyweb.jpg' },
-            caption: `> *CASEYRHODES MINI - PAIRING COMPLETED* ✅\n\n*🔑 Your Pairing Code:* \`\`\`${result.code}\`\`\`\n\n*📝 Pairing Instructions:*\n\n1. Use the code above to pair your device\n2. Keep this code secure and do not share it\n3. Complete the pairing process within your device settings\n\n*Need help?* Use the button below for support`,
-            buttons: [
-                { buttonId: '.owner', buttonText: { displayText: '👨‍💻 Support' }, type: 1 }
-            ],
-            headerType: 4
-        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
 
     } catch (err) {
         console.error("❌ Pair Command Error:", err);
         await socket.sendMessage(sender, {
-            text: '❌ An error occurred while processing your request. Please try again later.',
+            text: '❌ ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ.',
             buttons: [
-                { buttonId: '.owner', buttonText: { displayText: '👨‍💻 Contact Support' }, type: 1 }
+                { buttonId: `${prefix}owner`, buttonText: { displayText: '👨‍💻 sᴜᴘᴘᴏʀᴛ' }, type: 1 }
             ]
         }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
     }
     
     break;
@@ -10898,6 +10761,99 @@ case 'gamehistory': {
     }
     break;
 }
+// Case: grouplink / invitelink / link - Get or revoke group invite link
+case 'grouplink':
+case 'invitelink':
+case 'link': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
+        }
+        if (!isSenderGroupAdmin && !isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🔗', key: msg.key } });
+
+        const code = await socket.groupInviteCode(from);
+        const link = `https://chat.whatsapp.com/${code}`;
+
+        await socket.sendMessage(sender, {
+            text: `🔗 *ɢʀᴏᴜᴘ ɪɴᴠɪᴛᴇ ʟɪɴᴋ*\n\n${link}\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}revoke`, buttonText: { displayText: '🔄 ʀᴇᴠᴏᴋᴇ ʟɪɴᴋ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Link] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
+
+// Case: revoke / revokelink - Revoke group invite link
+case 'revoke':
+case 'revokelink': {
+    try {
+        if (!isGroup) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
+        }
+        if (!isSenderGroupAdmin && !isOwner) {
+            await socket.sendMessage(sender, {
+                text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*',
+                quoted: msg
+            });
+            break;
+        }
+
+        await socket.sendMessage(sender, { react: { text: '🔄', key: msg.key } });
+
+        await socket.groupRevokeInvite(from);
+        const newCode = await socket.groupInviteCode(from);
+        const newLink = `https://chat.whatsapp.com/${newCode}`;
+
+        await socket.sendMessage(sender, {
+            text: `🔄 *ɪɴᴠɪᴛᴇ ʟɪɴᴋ ʀᴇᴠᴏᴋᴇᴅ!*\n\nɴᴇᴡ ʟɪɴᴋ:\n${newLink}\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}link`, buttonText: { displayText: '🔗 ɢᴇᴛ ʟɪɴᴋ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (error) {
+        console.error('[Revoke] Error:', error.message);
+        await socket.sendMessage(sender, {
+            text: `❌ *ғᴀɪʟᴇᴅ*\n\n${error.message}`,
+            quoted: msg
+        });
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+    }
+    break;
+}
                 // Case: open - Unlock group (allow all members to send messages)
 case 'open': {
     await socket.sendMessage(sender, { react: { text: '🔓', key: msg.key } });
@@ -10992,7 +10948,176 @@ case 'close': {
     }
     break;
 }
+// Case: accept / acceptall - Accept join requests
+case 'accept':
+case 'acceptall': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
 
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+        const reqs = await socket.groupRequestParticipantsList(from);
+        if (!reqs?.length) { await socket.sendMessage(sender, { text: '📋 ɴᴏ ᴘᴇɴᴅɪɴɢ ᴊᴏɪɴ ʀᴇǫᴜᴇsᴛs.', quoted: msg }); break; }
+
+        await socket.groupRequestParticipantsUpdate(from, reqs.map(r => r.jid), 'approve');
+        await socket.sendMessage(sender, { text: `✅ ᴀᴘᴘʀᴏᴠᴇᴅ ᴀʟʟ *${reqs.length}* ʀᴇǫᴜᴇsᴛs.\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    } catch { await socket.sendMessage(sender, { text: '❌ ғᴀɪʟᴇᴅ.', quoted: msg }); }
+    break;
+}
+
+// Case: reject / rejectall - Reject join requests
+case 'reject':
+case 'rejectall': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+
+        await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
+        const reqs = await socket.groupRequestParticipantsList(from);
+        if (!reqs?.length) { await socket.sendMessage(sender, { text: '📋 ɴᴏ ᴘᴇɴᴅɪɴɢ ᴊᴏɪɴ ʀᴇǫᴜᴇsᴛs.', quoted: msg }); break; }
+
+        await socket.groupRequestParticipantsUpdate(from, reqs.map(r => r.jid), 'reject');
+        await socket.sendMessage(sender, { text: `❌ ʀᴇᴊᴇᴄᴛᴇᴅ ᴀʟʟ *${reqs.length}* ʀᴇǫᴜᴇsᴛs.\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    } catch { await socket.sendMessage(sender, { text: '❌ ғᴀɪʟᴇᴅ.', quoted: msg }); }
+    break;
+}
+
+// Case: listrequests - List join requests
+case 'listrequests': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+
+        await socket.sendMessage(sender, { react: { text: '📋', key: msg.key } });
+        const reqs = await socket.groupRequestParticipantsList(from);
+        if (!reqs?.length) { await socket.sendMessage(sender, { text: '📋 ɴᴏ ᴘᴇɴᴅɪɴɢ ᴊᴏɪɴ ʀᴇǫᴜᴇsᴛs.', quoted: msg }); break; }
+
+        const list = reqs.slice(0, 20).map((r, i) => `*${i + 1}.* +${r.jid?.split('@')[0]}`).join('\n');
+        await socket.sendMessage(sender, { text: `📋 *ᴊᴏɪɴ ʀᴇǫᴜᴇsᴛs (${reqs.length})*\n\n${list}\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    } catch { await socket.sendMessage(sender, { text: '❌ ғᴀɪʟᴇᴅ.', quoted: msg }); }
+    break;
+}
+
+// Case: groupsettings - Show group settings
+case 'groupsettings': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+
+        await socket.sendMessage(sender, { react: { text: '⚙️', key: msg.key } });
+        const meta = await socket.groupMetadata(from);
+        const p = meta.participants || [];
+        const admins = p.filter(x => x.admin).length;
+        const ephem = meta.ephemeralDuration;
+        const label = ephem ? (ephem === 86400 ? '24h' : ephem === 604800 ? '7d' : '90d') : 'OFF';
+
+        await socket.sendMessage(sender, {
+            text: `⚙️ *ɢʀᴏᴜᴘ sᴇᴛᴛɪɴɢs*\n\n` +
+                  `👥 ᴍᴇᴍʙᴇʀs: *${p.length}*\n` +
+                  `👑 ᴀᴅᴍɪɴs: *${admins}*\n` +
+                  `🔒 ʟᴏᴄᴋᴇᴅ: *${meta.announce ? 'Yes' : 'No'}*\n` +
+                  `⏳ ᴅɪsᴀᴘᴘᴇᴀʀ: *${label}*\n\n` +
+                  `> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}ginfo`, buttonText: { displayText: '📊 ɢʀᴏᴜᴘ ɪɴғᴏ' }, type: 1 },
+                { buttonId: `${prefix}menu`, buttonText: { displayText: '📋 ᴍᴇɴᴜ' }, type: 1 }
+            ],
+            headerType: 1
+        }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    } catch (e) { await socket.sendMessage(sender, { text: `❌ ${e.message}`, quoted: msg }); }
+    break;
+}
+
+// Case: everyone - Tag all members
+case 'everyone': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+
+        const meta = await socket.groupMetadata(from);
+        const participants = meta.participants || [];
+        const text = args.join(' ').trim() || '👋 ᴀᴛᴛᴇɴᴛɪᴏɴ ᴇᴠᴇʀʏᴏɴᴇ!';
+        const mentions = participants.map(p => p.id);
+
+        await socket.sendMessage(from, { text, mentions });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    } catch (e) { await socket.sendMessage(sender, { text: `❌ ${e.message}`, quoted: msg }); }
+    break;
+}
+
+// Case: mute / unmute - Mute/unmute group
+case 'mute': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+
+        await socket.groupSettingUpdate(from, 'announcement');
+        await socket.sendMessage(sender, { text: `🔇 *ɢʀᴏᴜᴘ ᴍᴜᴛᴇᴅ!*\n\nᴏɴʟʏ ᴀᴅᴍɪɴs ᴄᴀɴ sᴇɴᴅ ᴍᴇssᴀɢᴇs.\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    } catch { await socket.sendMessage(sender, { text: '❌ ғᴀɪʟᴇᴅ.', quoted: msg }); }
+    break;
+}
+
+// Case: unmute / open (when not adding)
+case 'unmute': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+
+        await socket.groupSettingUpdate(from, 'not_announcement');
+        await socket.sendMessage(sender, { text: `🔊 *ɢʀᴏᴜᴘ ᴜɴᴍᴜᴛᴇᴅ!*\n\nᴇᴠᴇʀʏᴏɴᴇ ᴄᴀɴ sᴇɴᴅ ᴍᴇssᴀɢᴇs.\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    } catch { await socket.sendMessage(sender, { text: '❌ ғᴀɪʟᴇᴅ.', quoted: msg }); }
+    break;
+}
+
+// Case: disapp - Set disappearing messages
+case 'disapp': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+
+        const secs = parseInt(args[0]) || 0;
+        const valid = [0, 86400, 604800, 7776000];
+        const v = valid.includes(secs) ? secs : 604800;
+        await socket.groupToggleEphemeral(from, v);
+        const label = v === 0 ? 'OFF' : v === 86400 ? '24h' : v === 604800 ? '7d' : '90d';
+        await socket.sendMessage(sender, { text: `⏳ ᴅɪsᴀᴘᴘᴇᴀʀɪɴɢ ᴍᴇssᴀɢᴇs: *${label}*\n\n> ${config.BOT_FOOTER}`, quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+    } catch { await socket.sendMessage(sender, { text: '❌ ғᴀɪʟᴇᴅ.', quoted: msg }); }
+    break;
+}
+
+// Case: del - Delete quoted message
+case 'del': {
+    try {
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isSenderGroupAdmin && !isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴀᴅᴍɪɴ ᴏɴʟʏ*', quoted: msg }); break; }
+
+        const key = msg.message?.extendedTextMessage?.contextInfo?.stanzaId;
+        const participant = msg.message?.extendedTextMessage?.contextInfo?.participant;
+        if (!key) { await socket.sendMessage(sender, { text: '❌ ʀᴇᴘʟʏ ᴛᴏ ᴀ ᴍᴇssᴀɢᴇ ᴛᴏ ᴅᴇʟᴇᴛᴇ.', quoted: msg }); break; }
+
+        await socket.sendMessage(from, { delete: { remoteJid: from, fromMe: false, id: key, participant } });
+        await socket.sendMessage(sender, { react: { text: '🗑️', key: msg.key } });
+    } catch { await socket.sendMessage(sender, { text: '❌ ғᴀɪʟᴇᴅ.', quoted: msg }); }
+    break;
+}
+
+// Case: killgc - Bot leaves group (owner only)
+case 'killgc': {
+    try {
+        if (!isOwner) { await socket.sendMessage(sender, { text: '❌ *ᴏᴡɴᴇʀ ᴏɴʟʏ*', quoted: msg }); break; }
+        if (!isGroup) { await socket.sendMessage(sender, { text: '❌ *ɢʀᴏᴜᴘ ᴏɴʟʏ*', quoted: msg }); break; }
+
+        await socket.sendMessage(from, { text: '💀 *ɢᴏᴏᴅʙʏᴇ!* ʙᴏᴛ ɪs ʟᴇᴀᴠɪɴɢ...' });
+        await socket.groupLeave(from);
+    } catch (e) { await socket.sendMessage(sender, { text: `❌ ${e.message}`, quoted: msg }); }
+    break;
+}
                 // Case: tagall - Tag all group members
                 case 'tagall': {
                 await socket.sendMessage(sender, { react: { text: '🫂', key: msg.key } });
