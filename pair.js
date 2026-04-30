@@ -4664,7 +4664,6 @@ case 'instagramstalk': {
     break;
 }
 // Case: pair
-// Case: pair
 case 'pair': {
     const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
@@ -4706,51 +4705,29 @@ case 'pair': {
             });
         }
 
-        // METHOD 1: CTA Copy button (works on some Baileys versions)
-        const copyButtonMessage = {
-            text: `*📋 ᴛᴀᴘ ᴛʜᴇ ʙᴜᴛᴛᴏɴ ʙᴇʟᴏᴡ ᴛᴏ ᴄᴏᴘʏ ʏᴏᴜʀ ᴄᴏᴅᴇ*`,
-            footer: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ ʙᴏᴛ',
-            templateButtons: [
-                {
-                    index: 1,
-                    copyCodeButton: {
-                        displayText: '📋 ᴄᴏᴘʏ ᴘᴀɪʀɪɴɢ ᴄᴏᴅᴇ',
-                        code: result.code
-                    }
-                },
-                {
-                    index: 2,
-                    quickReplyButton: {
-                        displayText: '👨‍💻 sᴜᴘᴘᴏʀᴛ',
-                        id: `${prefix}owner`
-                    }
-                }
-            ],
-            headerType: 1
-        };
+        // Send code as a separate copyable message
+        // The code sent as a standalone text can be easily copied by tapping it
+        await socket.sendMessage(sender, {
+            text: `${result.code}`  // Standalone code - easily copyable
+        }, { quoted: msg });
 
-        // Try sending with copy button
-        try {
-            await socket.sendMessage(sender, copyButtonMessage, { quoted: msg });
-        } catch (copyError) {
-            // Fallback: Send code as standalone message for easy copying
-            console.log('Copy button not supported, using fallback');
-            await socket.sendMessage(sender, {
-                text: `*🔑 ʏᴏᴜʀ ᴘᴀɪʀɪɴɢ ᴄᴏᴅᴇ:*\n\n\`\`\`${result.code}\`\`\`\n\n_ᴛᴀᴘ & ʜᴏʟᴅ ᴛʜᴇ ᴄᴏᴅᴇ ᴀʙᴏᴠᴇ ᴛᴏ ᴄᴏᴘʏ ɪᴛ_`,
-                buttons: [
-                    { buttonId: `${prefix}owner`, buttonText: { displayText: '👨‍💻 sᴜᴘᴘᴏʀᴛ' }, type: 1 },
-                    { buttonId: `${prefix}pair`, buttonText: { displayText: '🔄 ɴᴇᴡ ᴄᴏᴅᴇ' }, type: 1 }
-                ],
-                headerType: 1
-            }, { quoted: msg });
-        }
+        // Then send the instruction message with buttons
+        await socket.sendMessage(sender, {
+            image: { url: config.RCD_IMAGE_PATH },
+            caption: `> *ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ - ᴘᴀɪʀɪɴɢ ✅*\n\n*🔑 ʏᴏᴜʀ ᴘᴀɪʀɪɴɢ ᴄᴏᴅᴇ:* \`\`\`${result.code}\`\`\`\n\n📝 *ɪɴsᴛʀᴜᴄᴛɪᴏɴs:*\n1. ᴄᴏᴘʏ ᴛʜᴇ ᴄᴏᴅᴇ ᴀʙᴏᴠᴇ\n2. ᴘᴀsᴛᴇ ɪᴛ ɪɴ ʏᴏᴜʀ ᴡʜᴀᴛsᴀᴘᴘ ʟɪɴᴋᴇᴅ ᴅᴇᴠɪᴄᴇs\n3. ᴋᴇᴇᴘ ᴛʜɪs ᴄᴏᴅᴇ sᴇᴄᴜʀᴇ\n\n> ${config.BOT_FOOTER}`,
+            buttons: [
+                { buttonId: `${prefix}owner`, buttonText: { displayText: '👨‍💻 sᴜᴘᴘᴏʀᴛ' }, type: 1 },
+                { buttonId: `${prefix}pair`, buttonText: { displayText: '🔄 ɴᴇᴡ ᴄᴏᴅᴇ' }, type: 1 }
+            ],
+            headerType: 4
+        }, { quoted: msg });
 
         await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
 
     } catch (err) {
         console.error("❌ Pair Command Error:", err);
         await socket.sendMessage(sender, {
-            text: '❌ ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ.',
+            text: '❌ ᴀɴ ᴇʀʀᴏʀ ᴏᴄᴄᴜʀʀᴇᴅ. ᴘʟᴇᴀsᴇ ᴛʀʏ ᴀɢᴀɪɴ.',
             buttons: [
                 { buttonId: `${prefix}owner`, buttonText: { displayText: '👨‍💻 sᴜᴘᴘᴏʀᴛ' }, type: 1 }
             ]
@@ -4760,7 +4737,6 @@ case 'pair': {
     
     break;
 }
-
 //case tagadmin
 case 'tagadmins':
 case 'gc_tagadmins': {
@@ -5446,127 +5422,6 @@ case 'lyric': {
             headerType: 1
         }, { quoted: msg });
         await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } });
-    }
-    break;
-}
-case 'play': {
-    try {
-        // React to the command first
-        await socket.sendMessage(sender, {
-            react: {
-                text: "🎶",
-                key: msg.key
-            }
-        });
-
-        const axios = require('axios');
-        const yts = require('yt-search');
-
-        // Extract query from message
-        const q = msg.message?.conversation || 
-                  msg.message?.extendedTextMessage?.text || 
-                  msg.message?.imageMessage?.caption || 
-                  msg.message?.videoMessage?.caption || '';
-        
-        const args = q.split(' ').slice(1);
-        const query = args.join(' ').trim();
-
-        if (!query) {
-            return await socket.sendMessage(sender, {
-                text: '*🎵 Audio Player*\nPlease provide a song name to play.*'
-            }, { quoted: msg });
-        }
-
-        console.log('[PLAY] Searching YT for:', query);
-        const search = await yts(query);
-        const video = search.videos[0];
-
-        if (!video) {
-            return await socket.sendMessage(sender, {
-                text: '*❌ No Results Found*\nNo songs found for your query. Please try different keywords.*'
-            }, { quoted: msg });
-        }
-
-        const safeTitle = video.title.replace(/[\\/:*?"<>|]/g, '');
-        const fileName = `${safeTitle}.mp3`;
-        
-        // Using the new API endpoint
-        const apiURL = `https://api.giftedtech.co.ke/api/download/ytmp3?apikey=gifted&url=${encodeURIComponent(video.url)}`;
-
-        // Create single button for getting video
-        const buttonMessage = {
-            image: { url: video.thumbnail },
-            caption: `
-🎧 *NOW PLAYING* 🎧
-
-🎶 *Title:* ${video.title}
-⏱️ *Duration:* ${video.timestamp}
-👁️ *Views:* ${video.views}
-📅 *Uploaded:* ${video.ago}
-🔗 *YouTube URL:* ${video.url}
-
-⬇️ *Downloading your audio...* ⬇️
-            `.trim(),
-            footer: 'ᴄᴀsᴇʏʀʜᴏᴅᴇs ᴍɪɴɪ - ᴀᴜᴅɪᴏ ᴘʟᴀʏᴇʀ',
-            buttons: [
-                {
-                    buttonId: '.alive ' + video.title,
-                    buttonText: { displayText: '👑 ALIVE' },
-                    type: 1
-                }
-            ],
-            headerType: 1
-        };
-
-        // Send song description with thumbnail and single button
-        await socket.sendMessage(sender, buttonMessage, { quoted: msg });
-
-        // Get download link from new API
-        const response = await axios.get(apiURL, { timeout: 30000 });
-        
-        // Log the response to see its structure (for debugging)
-        console.log('[PLAY] API Response:', JSON.stringify(response.data, null, 2));
-
-        // Check different possible response structures
-        let downloadUrl = null;
-        
-        if (response.data.download_url) {
-            downloadUrl = response.data.download_url;
-        } else if (response.data.download) {
-            downloadUrl = response.data.download;
-        } else if (response.data.url) {
-            downloadUrl = response.data.url;
-        } else if (response.data.result && response.data.result.download_url) {
-            downloadUrl = response.data.result.download_url;
-        } else if (response.data.data && response.data.data.url) {
-            downloadUrl = response.data.data.url;
-        } else if (typeof response.data === 'string' && response.data.startsWith('http')) {
-            downloadUrl = response.data;
-        }
-
-        if (!downloadUrl) {
-            console.log('[PLAY] Full API Response:', response.data);
-            return await socket.sendMessage(sender, {
-                text: '*❌ Download Failed*\nFailed to retrieve the MP3 download link. Please try again later.*'
-            }, { quoted: msg });
-        }
-
-        // Send audio file without caption/success message
-        await socket.sendMessage(sender, {
-            audio: { url: downloadUrl },
-            mimetype: 'audio/mpeg',
-            fileName: fileName,
-            ptt: false // Important: ensures it's treated as music, not voice message
-        });
-
-    } catch (err) {
-        console.error('[PLAY] Error:', err.message);
-        if (err.response) {
-            console.error('[PLAY] API Error Response:', err.response.data);
-        }
-        await socket.sendMessage(sender, {
-            text: '*❌ Error Occurred*\nUnable to process your request. Please try again later.*'
-        }, { quoted: msg });
     }
     break;
 }
